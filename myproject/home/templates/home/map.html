@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Bản đồ ĐH Tài nguyên và Môi trường TP.HCM</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        body { margin: 0; padding: 0; }
+        #map { width: 100%; height: 100vh; } /* Bản đồ full màn hình */
+        
+        /* Style cho Legend (Chú thích) */
+        .leaflet-popup-content-wrapper { border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        // --- A. Khởi tạo bản đồ ---
+        // Tọa độ HCMUNRE (Lê Văn Sỹ): [10.7984, 106.6655]
+        var map = L.map('map').setView([10.7984, 106.6655], 18);
+
+        // --- B. Thêm lớp nền (Base Map) ---
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // --- C. Nhận dữ liệu từ Django View ---
+        // Dữ liệu này được truyền từ views.py
+        var buildingsData = {{ buildings_json|safe }};
+        var treesData = {{ trees_json|safe }};
+        var incidentsData = {{ incidents_json|safe }};
+
+        // --- D. Định nghĩa Style cho từng lớp ---
+
+        // 1. Style Tòa nhà (Màu xanh dương đậm, viền rõ)
+        var buildingStyle = {
+            "color": "#2980b9",
+            "weight": 3,
+            "opacity": 1,
+            "fillColor": "#3498db",
+            "fillOpacity": 0.5
+        };
+
+        // 2. Style Cây (Hình tròn màu xanh lá)
+        function treePoint(feature, latlng) {
+            var color = "#27ae60"; // Xanh lá mặc định
+            if (feature.properties.health_status == 'diseased') color = "#f39c12"; // Cam
+            if (feature.properties.health_status == 'dangerous') color = "#c0392b"; // Đỏ
+            
+            return L.circleMarker(latlng, {
+                radius: 5,
+                fillColor: color,
+                color: "#fff",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 1
+            });
+        }
+
+        // 3. Style Sự cố (Hình tròn nhấp nháy đỏ)
+        function incidentPoint(feature, latlng) {
+            return L.circleMarker(latlng, {
+                radius: 10,
+                fillColor: "#e74c3c", 
+                color: "#c0392b",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            });
+        }
+
+        // --- E. Thêm các lớp vào bản đồ ---
+
+        // Lớp Tòa nhà
+        var buildingsLayer = L.geoJSON(buildingsData, {
+            style: buildingStyle,
+            onEachFeature: function (feature, layer) {
+                layer.bindPopup("<b>🏢 " + feature.properties.name + "</b><br>" + feature.properties.description);
+            }
+        }).addTo(map);
+
+        // Lớp Cây xanh
+        var treesLayer = L.geoJSON(treesData, {
+            pointToLayer: treePoint,
+            onEachFeature: function (feature, layer) {
+                var status = feature.properties.health_status;
+                var icon = "🌳";
+                if (status == 'dangerous') icon = "⚠️";
+                layer.bindPopup("<b>" + icon + " Cây: " + feature.properties.species + "</b><br>Mã: " + feature.properties.code + "<br>Tình trạng: " + status);
+            }
+        }).addTo(map);
+
+        // Lớp Sự cố
+        var incidentsLayer = L.geoJSON(incidentsData, {
+            pointToLayer: incidentPoint,
+            onEachFeature: function (feature, layer) {
+                var priority = feature.properties.priority;
+                var color = priority == 'high' ? 'red' : 'black';
+                layer.bindPopup("<b>🔥 SỰ CỐ: " + feature.properties.title + "</b><br>Mức độ: <span style='color:"+color+"'><b>" + priority.toUpperCase() + "</b></span><br>Trạng thái: " + feature.properties.status);
+            }
+        }).addTo(map);
+
+        // --- F. Bộ điều khiển Layer ---
+        var overlayMaps = {
+            "Tòa nhà": buildingsLayer,
+            "Cây xanh": treesLayer,
+            "Sự cố": incidentsLayer
+        };
+        L.control.layers(null, overlayMaps).addTo(map);
+
+    </script>
+</body>
+</html>
