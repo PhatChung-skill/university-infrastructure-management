@@ -1,0 +1,23 @@
+{% extends "admin/base.html" %}
+{% load i18n %}
+
+{# 
+  Giao diện admin giữ nguyên như mặc định của Django,
+  chỉ thêm nút điều hướng sang trang map ở thanh trên cùng bên phải.
+#}
+
+{% block branding %}
+  {{ block.super }}
+{% endblock %}
+
+{% block nav-global %}
+  {{ block.super }}
+  <div style="margin-left: 1rem;">
+    <a href="{% url 'map_view' %}"
+       class="button"
+       style="background-color: #4caf50; border-color: #4caf50;">
+      {% trans "Map" %}
+    </a>
+  </div>
+{% endblock %}
+
