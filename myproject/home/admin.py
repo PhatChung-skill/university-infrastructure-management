@@ -1,8 +1,8 @@
 from django.contrib import admin
-
+from django.contrib.auth.models import User
 from django.contrib.gis.admin import GISModelAdmin
 from .models import (
-    Role, AppUser, Building, Room, Tree, Equipment, 
+    Role, AppUser, Building, Room, Tree, Equipment,
     Asset, IncidentType, Incident, Maintenance
 )
 
@@ -15,6 +15,24 @@ class RoleAdmin(admin.ModelAdmin):
 class AppUserAdmin(admin.ModelAdmin):
     list_display = ('username', 'role')
     list_filter = ('role',)
+
+    def save_model(self, request, obj, form, change):
+        """
+        Mỗi khi bạn tạo / sửa AppUser trong Django Admin:
+        - Đồng bộ sang bảng User mặc định của Django để dùng cho đăng nhập (/login/)
+        - AppUser.password đã được hash trong model, nên copy thẳng sang User.password
+        """
+        super().save_model(request, obj, form, change)
+
+        # Tạo (hoặc lấy) user tương ứng trong bảng auth_user
+        user, created = User.objects.get_or_create(username=obj.username)
+        user.password = obj.password  # đã hash từ AppUser.save()
+        user.is_active = True
+
+        # Nếu role là Admin thì cho quyền staff để vào /admin/ nếu cần
+        if obj.role and obj.role.name.lower() == "admin":
+            user.is_staff = True
+        user.save()
 
 @admin.register(IncidentType)
 class IncidentTypeAdmin(admin.ModelAdmin):

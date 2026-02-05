@@ -1,35 +1,55 @@
-/* Login form custom styles — complements Bootstrap */
+/* Login form custom styles — complements Bootstrap (theme xanh lá) */
 body.login-bg {
-  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
 }
+
 .card.login-card {
   border: none;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
+
 .card.login-card .card-body {
-  padding: 2rem;
+  padding: 2.25rem;
 }
+
 .card.login-card .card-title {
-  font-weight: 600;
+  font-weight: 700;
+  color: #1b5e20;
 }
+
 .form-control {
   height: 48px;
-  border-radius: 8px;
+  border-radius: 10px;
   box-shadow: none;
+  border-color: #c8e6c9;
 }
+
 .form-control:focus {
-  box-shadow: 0 0 0 0.2rem rgba(13,110,253,.12);
-  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.18rem rgba(56, 142, 60, 0.25);
+  border-color: #2e7d32;
 }
+
 .btn-primary {
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 12px;
   font-weight: 600;
+  background: linear-gradient(135deg, #2e7d32, #43a047);
+  border-color: #2e7d32;
 }
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  border-color: #1b5e20;
+}
+
 .invalid-feedback.d-block {
   margin-top: .25rem;
 }
+
 @media (max-width: 576px) {
- .card.login-card .card-body { padding: 1.25rem; }
+  .card.login-card .card-body {
+    padding: 1.5rem;
+  }
 }
