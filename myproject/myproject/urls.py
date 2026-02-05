@@ -16,12 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from django.contrib.auth import views as auth_views 
 from home import views as core_views
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('home.urls')),
-    path('map/', core_views.map_view, name='map_view'), # <--- Đường dẫn vào bản đồ
+    path('map/', core_views.map_view, name='map_view'),  # Đường dẫn vào bản đồ
+    # Đăng xuất: dùng view custom, luôn quay về /login/
+    path('logout/', core_views.logout_view, name='logout'),
 ]
 
