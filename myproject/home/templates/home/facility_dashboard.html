@@ -1,0 +1,201 @@
+{% load static %}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nhân viên CSVC - Quản lý & Bảo trì tài sản</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
+      min-height: 100vh;
+    }
+    .navbar-csvc {
+      background-color: #2e7d32;
+    }
+    .navbar-csvc .navbar-brand,
+    .navbar-csvc .nav-link,
+    .navbar-csvc .navbar-text {
+      color: #e8f5e9 !important;
+    }
+    .card-csvc {
+      border: none;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    }
+    .card-csvc-header {
+      border-bottom: none;
+      background: linear-gradient(135deg, #2e7d32, #43a047);
+      color: #e8f5e9;
+      border-radius: 16px 16px 0 0;
+      padding: 1rem 1.5rem;
+    }
+    .btn-csvc-primary {
+      background: linear-gradient(135deg, #2e7d32, #43a047);
+      border-color: #2e7d32;
+      border-radius: 10px;
+      padding: 0.6rem 1.4rem;
+      font-weight: 600;
+    }
+    .btn-csvc-primary:hover {
+      background: linear-gradient(135deg, #1b5e20, #2e7d32);
+      border-color: #1b5e20;
+    }
+    .badge-asset-type {
+      font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <!-- Thanh điều hướng -->
+  <nav class="navbar navbar-expand-lg navbar-csvc mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-semibold" href="#">
+        CSVC - Quản lý & Bảo trì tài sản
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCsvc"
+              aria-controls="navbarCsvc" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarCsvc">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'facility_dashboard' %}active{% endif %}"
+               aria-current="page" href="{% url 'facility_dashboard' %}">Bảo trì tài sản</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'facility_incident' %}active{% endif %}"
+               href="{% url 'facility_incident' %}">Báo cáo sự cố</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'map_view' %}">Bản đồ</a>
+          </li>
+        </ul>
+        <span class="navbar-text me-3">
+          {{ request.user.username }}
+        </span>
+        <a class="btn btn-sm btn-outline-light" href="{% url 'logout' %}">Đăng xuất</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container pb-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-8">
+        <div class="card card-csvc mb-4">
+          <div class="card-csvc-header">
+            <h5 class="mb-0">Tạo phiếu bảo trì tài sản</h5>
+            <small class="d-block mt-1">Chọn tài sản (thiết bị / cây), nhập thông tin bảo trì và lưu lại.</small>
+          </div>
+          <div class="card-body p-4">
+            {% if messages %}
+              {% for message in messages %}
+                <div class="alert alert-success py-2">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+
+            <form method="post" novalidate>
+              {% csrf_token %}
+
+              <div class="mb-3">
+                <label class="form-label">{{ form.asset.label }}</label>
+                {{ form.asset }}
+                {% for error in form.asset.errors %}
+                  <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">{{ form.maintenance_type.label }}</label>
+                  {{ form.maintenance_type }}
+                  {% for error in form.maintenance_type.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">{{ form.maintenance_date.label }}</label>
+                  {{ form.maintenance_date }}
+                  {% for error in form.maintenance_date.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">{{ form.cost.label }}</label>
+                  {{ form.cost }}
+                  {% for error in form.cost.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">{{ form.note.label }}</label>
+                  {{ form.note }}
+                  {% for error in form.note.errors %}
+                    <div class="text-danger small">{{ error }}</div>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-end">
+                <button type="submit" class="btn btn-csvc-primary">
+                  Lưu phiếu bảo trì
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="card card-csvc">
+          <div class="card-header bg-white border-0 pb-0">
+            <h6 class="mb-1">Lịch sử bảo trì gần đây</h6>
+            <small class="text-muted">Các phiếu do bạn thực hiện.</small>
+          </div>
+          <div class="card-body">
+            {% if recent_maintenances %}
+              <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Ngày</th>
+                      <th>Tài sản</th>
+                      <th>Loại bảo trì</th>
+                      <th>Chi phí</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for m in recent_maintenances %}
+                      <tr>
+                        <td>{{ m.maintenance_date|date:"d/m/Y" }}</td>
+                        <td>
+                          {{ m.asset }}
+                        </td>
+                        <td>{{ m.get_maintenance_type_display }}</td>
+                        <td>
+                          {% if m.cost %}
+                            {{ m.cost }} đ
+                          {% else %}
+                            -
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            {% else %}
+              <p class="text-muted mb-0">Chưa có phiếu bảo trì nào được ghi nhận.</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
