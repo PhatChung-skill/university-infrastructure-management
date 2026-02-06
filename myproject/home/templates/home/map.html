@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
     <title>Bản đồ ĐH Tài nguyên và Môi trường TP.HCM</title>
     <meta charset="utf-8" />
@@ -8,14 +8,69 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        body { margin: 0; padding: 0; }
+        :root { --topbar-h: 56px; }
+        body { margin: 0; padding: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
         #map { width: 100%; height: 100vh; } /* Bản đồ full màn hình */
         
         /* Style cho Legend (Chú thích) */
         .leaflet-popup-content-wrapper { border-radius: 5px; }
+
+        /* Back bar */
+        .map-topbar{
+            position: fixed;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: var(--topbar-h);
+            z-index: 1100;
+            background: linear-gradient(135deg, #2e7d32, #43a047);
+            color: #e8f5e9;
+            box-shadow: 0 6px 18px rgba(0,0,0,.15);
+            display: flex;
+            align-items: center;
+        }
+        .map-topbar .inner{
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 0 14px;
+        }
+        .map-topbar a.back{
+            color: #e8f5e9;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: rgba(255,255,255,.12);
+        }
+        .map-topbar a.back:hover{ background: rgba(255,255,255,.18); }
+        .map-topbar .title{
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* Không che mất control của leaflet ở góc trái trên */
+        .leaflet-top.leaflet-left{ top: calc(var(--topbar-h) + 10px); }
     </style>
 </head>
 <body>
+
+    <div class="map-topbar">
+        <div class="inner">
+            <div>
+                {% if back_url %}
+                    <a class="back" href="{{ back_url }}">{{ back_label }}</a>
+                {% else %}
+                    <a class="back" href="{% url 'login' %}">← Quay lại đăng nhập</a>
+                {% endif %}
+            </div>
+            <div class="title">Bản đồ khuôn viên</div>
+            <div style="width: 1px;"></div>
+        </div>
+    </div>
 
     <div id="map"></div>
 
@@ -36,6 +91,25 @@
         var buildingsData = {{ buildings_json|safe }};
         var treesData = {{ trees_json|safe }};
         var incidentsData = {{ incidents_json|safe }};
+
+        // --- D0. Mapping hiển thị tiếng Việt ---
+        var VI_TREE_STATUS = {
+            "good": "Tốt",
+            "diseased": "Bệnh",
+            "dangerous": "Nguy hiểm"
+        };
+
+        var VI_INCIDENT_PRIORITY = {
+            "low": "Thấp",
+            "medium": "Trung bình",
+            "high": "Cao"
+        };
+
+        var VI_INCIDENT_STATUS = {
+            "open": "Mở",
+            "processing": "Đang xử lý",
+            "closed": "Đã đóng"
+        };
 
         // --- D. Định nghĩa Style cho từng lớp ---
 
@@ -93,7 +167,12 @@
                 var status = feature.properties.health_status;
                 var icon = "🌳";
                 if (status == 'dangerous') icon = "⚠️";
-                layer.bindPopup("<b>" + icon + " Cây: " + feature.properties.species + "</b><br>Mã: " + feature.properties.code + "<br>Tình trạng: " + status);
+                var viStatus = VI_TREE_STATUS[status] || status;
+                layer.bindPopup(
+                    "<b>" + icon + " Cây: " + feature.properties.species + "</b>"
+                    + "<br>Mã: " + feature.properties.code
+                    + "<br>Tình trạng: " + viStatus
+                );
             }
         }).addTo(map);
 
@@ -102,8 +181,15 @@
             pointToLayer: incidentPoint,
             onEachFeature: function (feature, layer) {
                 var priority = feature.properties.priority;
-                var color = priority == 'high' ? 'red' : 'black';
-                layer.bindPopup("<b>🔥 SỰ CỐ: " + feature.properties.title + "</b><br>Mức độ: <span style='color:"+color+"'><b>" + priority.toUpperCase() + "</b></span><br>Trạng thái: " + feature.properties.status);
+                var status = feature.properties.status;
+                var viPriority = VI_INCIDENT_PRIORITY[priority] || priority;
+                var viStatus = VI_INCIDENT_STATUS[status] || status;
+                var color = priority == 'high' ? 'red' : (priority == 'medium' ? '#f39c12' : '#2e7d32');
+                layer.bindPopup(
+                    "<b>🔥 SỰ CỐ: " + feature.properties.title + "</b>"
+                    + "<br>Mức độ: <span style='color:" + color + "'><b>" + viPriority + "</b></span>"
+                    + "<br>Trạng thái: " + viStatus
+                );
             }
         }).addTo(map);
 
