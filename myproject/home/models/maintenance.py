@@ -5,10 +5,10 @@ from .user import AppUser
 
 class Maintenance(models.Model):
     MAINTENANCE_TYPES = [
-        ('repair', 'Repair'),
-        ('inspection', 'Inspection'),
-        ('trim', 'Trim'),
-        ('replace', 'Replace'),
+        ("repair", "Sửa chữa"),
+        ("inspection", "Kiểm tra"),
+        ("trim", "Cắt tỉa"),
+        ("replace", "Thay thế"),
     ]
 
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE)

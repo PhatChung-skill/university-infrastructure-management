@@ -17,15 +17,15 @@ class IncidentType(models.Model):
 
 class Incident(models.Model):
     STATUS = [
-        ('open', 'Open'),
-        ('processing', 'Processing'),
-        ('closed', 'Closed'),
+        ("open", "Mở"),
+        ("processing", "Đang xử lý"),
+        ("closed", "Đã đóng"),
     ]
 
     PRIORITY = [
-        ('low', 'Low'),
-        ('medium', 'Medium'),
-        ('high', 'High'),
+        ("low", "Thấp"),
+        ("medium", "Trung bình"),
+        ("high", "Cao"),
     ]
 
     title = models.TextField()

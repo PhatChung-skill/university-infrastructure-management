@@ -19,6 +19,11 @@
     .navbar-csvc .navbar-text {
       color: #e8f5e9 !important;
     }
+    .navbar-csvc .nav-link.active {
+      font-weight: 700;
+      text-decoration: underline;
+      text-underline-offset: 6px;
+    }
     .card-csvc {
       border: none;
       border-radius: 16px;
@@ -49,9 +54,9 @@
 </head>
 <body>
   <!-- Thanh điều hướng -->
-  <nav class="navbar navbar-expand-lg navbar-csvc mb-4">
+  <nav class="navbar navbar-expand-lg navbar-dark navbar-csvc mb-4">
     <div class="container-fluid">
-      <a class="navbar-brand fw-semibold" href="#">
+      <a class="navbar-brand fw-semibold" href="{% url 'facility_dashboard' %}">
         CSVC - Quản lý & Bảo trì tài sản
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarCsvc"
@@ -91,7 +96,7 @@
           <div class="card-body p-4">
             {% if messages %}
               {% for message in messages %}
-                <div class="alert alert-success py-2">{{ message }}</div>
+                <div class="alert alert-{{ message.tags }} py-2 mb-3">{{ message }}</div>
               {% endfor %}
             {% endif %}
 
@@ -157,7 +162,7 @@
           <div class="card-body">
             {% if recent_maintenances %}
               <div class="table-responsive">
-                <table class="table table-sm align-middle mb-0">
+                <table class="table table-sm table-hover align-middle mb-0">
                   <thead class="table-light">
                     <tr>
                       <th>Ngày</th>
@@ -176,7 +181,7 @@
                         <td>{{ m.get_maintenance_type_display }}</td>
                         <td>
                           {% if m.cost %}
-                            {{ m.cost }} đ
+                            {{ m.cost|floatformat:0 }} VNĐ
                           {% else %}
                             -
                           {% endif %}

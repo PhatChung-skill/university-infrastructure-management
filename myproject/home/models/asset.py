@@ -5,8 +5,8 @@ from .tree import Tree
 
 class Asset(models.Model):
     ASSET_TYPES = [
-        ('equipment', 'Equipment'),
-        ('tree', 'Tree'),
+        ("equipment", "Thiết bị"),
+        ("tree", "Cây xanh"),
     ]
 
     equipment = models.OneToOneField(
@@ -22,4 +22,15 @@ class Asset(models.Model):
             raise ValueError("Asset must reference either equipment OR tree")
 
     def __str__(self):
-        return f"{self.asset_type} asset"
+        # Hiển thị thân thiện để dropdown "Tài sản" dễ chọn hơn
+        if self.asset_type == "equipment" and self.equipment:
+            name = (self.equipment.name or "").strip()
+            suffix = f" - {name}" if name else ""
+            return f"Thiết bị {self.equipment.code}{suffix}"
+
+        if self.asset_type == "tree" and self.tree:
+            species = (self.tree.species or "").strip()
+            suffix = f" - {species}" if species else ""
+            return f"Cây {self.tree.code}{suffix}"
+
+        return "Tài sản"

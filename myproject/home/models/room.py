@@ -4,11 +4,11 @@ from .building import Building
 
 class Room(models.Model):
     ROOM_TYPES = [
-        ('classroom', 'Classroom'),
-        ('lab', 'Lab'),
-        ('library', 'Library'),
-        ('office', 'Office'),
-        ('hall', 'Hall'),
+        ("classroom", "Phòng học"),
+        ("lab", "Phòng thí nghiệm"),
+        ("library", "Thư viện"),
+        ("office", "Văn phòng"),
+        ("hall", "Hội trường"),
     ]
 
     name = models.TextField()
