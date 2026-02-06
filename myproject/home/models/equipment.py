@@ -4,9 +4,9 @@ from .room import Room
 
 class Equipment(models.Model):
     STATUS = [
-        ('good', 'Good'),
-        ('broken', 'Broken'),
-        ('maintenance', 'Maintenance'),
+        ("good", "Tốt"),
+        ("broken", "Hỏng"),
+        ("maintenance", "Đang sửa"),
     ]
 
     code = models.CharField(max_length=50, unique=True)
