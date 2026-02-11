@@ -3,7 +3,7 @@
 {% block title %}{% if object %}Sửa người dùng{% else %}Thêm người dùng{% endif %}{% endblock %}
 
 {% block breadcrumbs %}
-  <a href="{% url 'admin_dashboard' %}">Admin</a> /
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> /
   <a href="{% url 'admin_user_list' %}">Người dùng</a> /
   {% if object %}Sửa{% else %}Thêm mới{% endif %}
 {% endblock %}

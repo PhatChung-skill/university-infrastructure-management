@@ -3,7 +3,7 @@
 {% block title %}Quản lý sự cố{% endblock %}
 
 {% block breadcrumbs %}
-  <a href="{% url 'admin_dashboard' %}">Admin</a> / Sự cố
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> / Sự cố
 {% endblock %}
 
 {% block content %}
@@ -18,7 +18,7 @@
   <div class="card-body">
     <form method="get" class="row g-2 mb-3">
       <div class="col-md-6">
-        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo tiêu đề hoặc mô tả...">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo tiêu đề, tài sản, loại hoặc mức độ...">
       </div>
       <div class="col-md-4">
         <select name="status" class="form-select">

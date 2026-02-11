@@ -47,6 +47,15 @@ class TreeAdminForm(forms.ModelForm):
     class Meta:
         model = Tree
         fields = ["code", "species", "height", "health_status", "planted_date", "last_trimmed", "note"]
+        labels = {
+            "code": "Mã cây",
+            "species": "Loài cây",
+            "height": "Chiều cao (m)",
+            "health_status": "Tình trạng",
+            "planted_date": "Ngày trồng",
+            "last_trimmed": "Lần cắt tỉa gần nhất",
+            "note": "Ghi chú",
+        }
         widgets = {
             "code": forms.TextInput(attrs={"placeholder": "VD: T001"}),
             "species": forms.TextInput(attrs={"placeholder": "VD: Cây phượng"}),
@@ -88,6 +97,15 @@ class EquipmentAdminForm(forms.ModelForm):
     class Meta:
         model = Equipment
         fields = ["code", "name", "equipment_type", "status", "install_date", "last_maintenance", "room"]
+        labels = {
+            "code": "Mã thiết bị",
+            "name": "Tên thiết bị",
+            "equipment_type": "Loại thiết bị",
+            "status": "Trạng thái",
+            "install_date": "Ngày lắp đặt",
+            "last_maintenance": "Lần bảo trì gần nhất",
+            "room": "Phòng",
+        }
         widgets = {
             "install_date": forms.DateInput(attrs={"type": "date"}),
             "last_maintenance": forms.DateInput(attrs={"type": "date"}),
@@ -126,6 +144,12 @@ class RoomAdminForm(forms.ModelForm):
     class Meta:
         model = Room
         fields = ["name", "room_type", "capacity", "building"]
+        labels = {
+            "name": "Tên phòng",
+            "room_type": "Loại phòng",
+            "capacity": "Sức chứa",
+            "building": "Tòa nhà",
+        }
         widgets = {}
 
     def __init__(self, *args, **kwargs):
@@ -164,6 +188,10 @@ class BuildingAdminForm(forms.ModelForm):
     class Meta:
         model = Building
         fields = ["name", "description"]
+        labels = {
+            "name": "Tên tòa nhà",
+            "description": "Mô tả",
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -203,6 +231,14 @@ class IncidentAdminForm(forms.ModelForm):
     class Meta:
         model = Incident
         fields = ["title", "description", "status", "priority", "asset", "incident_type"]
+        labels = {
+            "title": "Tiêu đề",
+            "description": "Mô tả",
+            "status": "Trạng thái",
+            "priority": "Mức độ ưu tiên",
+            "asset": "Tài sản",
+            "incident_type": "Loại sự cố",
+        }
         widgets = {
             "title": forms.TextInput(attrs={"placeholder": "Tiêu đề sự cố"}),
             "description": forms.Textarea(attrs={"rows": 3}),
@@ -238,6 +274,12 @@ class IncidentTypeAdminForm(forms.ModelForm):
     class Meta:
         model = IncidentType
         fields = ["code", "name", "description", "default_severity"]
+        labels = {
+            "code": "Mã loại sự cố",
+            "name": "Tên loại sự cố",
+            "description": "Mô tả",
+            "default_severity": "Mức độ nghiêm trọng mặc định (1-5)",
+        }
         widgets = {
             "description": forms.Textarea(attrs={"rows": 2}),
         }
@@ -252,6 +294,11 @@ class AssetAdminForm(forms.ModelForm):
     class Meta:
         model = Asset
         fields = ["asset_type", "equipment", "tree"]
+        labels = {
+            "asset_type": "Loại tài sản",
+            "equipment": "Thiết bị",
+            "tree": "Cây xanh",
+        }
         widgets = {}
 
     def __init__(self, *args, **kwargs):
@@ -264,6 +311,14 @@ class MaintenanceAdminForm(forms.ModelForm):
     class Meta:
         model = Maintenance
         fields = ["asset", "staff", "maintenance_type", "maintenance_date", "cost", "note"]
+        labels = {
+            "asset": "Tài sản",
+            "staff": "Nhân viên phụ trách",
+            "maintenance_type": "Loại bảo trì",
+            "maintenance_date": "Ngày bảo trì",
+            "cost": "Chi phí (VNĐ)",
+            "note": "Ghi chú",
+        }
         widgets = {
             "maintenance_date": forms.DateInput(attrs={"type": "date"}),
             "note": forms.Textarea(attrs={"rows": 2}),
@@ -279,7 +334,10 @@ class RoleAdminForm(forms.ModelForm):
     class Meta:
         model = Role
         fields = ["name"]
-        widgets = {"name": forms.TextInput(attrs={"placeholder": "VD: Admin, facility_staff"})}
+        labels = {
+            "name": "Tên vai trò",
+        }
+        widgets = {"name": forms.TextInput(attrs={"placeholder": "VD: Quản trị viên, Nhân viên CSVC"})}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -314,6 +372,10 @@ class AppUserAdminForm(forms.ModelForm):
     class Meta:
         model = AppUser
         fields = ["username", "role"]
+        labels = {
+            "username": "Tên đăng nhập",
+            "role": "Vai trò",
+        }
         widgets = {"username": forms.TextInput(attrs={"placeholder": "Tên đăng nhập"})}
 
     def __init__(self, *args, **kwargs):
