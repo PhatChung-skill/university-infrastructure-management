@@ -1,0 +1,104 @@
+{% extends "home/admin_base.html" %}
+
+{% block title %}{% if object %}Sửa phòng{% else %}Thêm phòng{% endif %}{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>#map { width: 100%; height: 360px; border-radius: 12px; border: 1px solid #c8e6c9; }</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="{% url 'admin_dashboard' %}">Admin</a> /
+  <a href="{% url 'admin_room_list' %}">Phòng</a> /
+  {% if object %}Sửa{% else %}Thêm mới{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    <div class="card card-admin">
+      <div class="card-admin-header">
+        <h5 class="mb-0">{% if object %}Sửa phòng{% else %}Thêm phòng mới{% endif %}</h5>
+        <small class="d-block mt-1">Chọn vị trí trên bản đồ để phòng hiển thị đúng trên bản đồ.</small>
+      </div>
+      <div class="card-body p-4">
+        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.name.label }}</label>
+              {{ form.name }}{% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.room_type.label }}</label>
+              {{ form.room_type }}{% for e in form.room_type.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.capacity.label }}</label>
+              {{ form.capacity }}{% for e in form.capacity.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.building.label }}</label>
+              {{ form.building }}{% for e in form.building.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+          <hr class="my-4" />
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label class="form-label">{{ form.latitude.label }}</label>
+              {{ form.latitude }}{% for e in form.latitude.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-4 mb-3">
+              <label class="form-label">{{ form.longitude.label }}</label>
+              {{ form.longitude }}{% for e in form.longitude.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label d-block">Chọn vị trí trên bản đồ</label>
+            <div id="map"></div>
+            <small class="text-muted d-block mt-1">Nhấn chuột vào bản đồ để đặt vị trí. Kéo marker để chỉnh.</small>
+          </div>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <a href="{% url 'admin_room_list' %}" class="btn btn-outline-secondary">Quay lại danh sách</a>
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+              <button type="submit" name="_save_action" value="save" class="btn btn-admin-primary">Lưu</button>
+              <button type="submit" name="_save_action" value="continue" class="btn btn-outline-success">Lưu và tiếp tục sửa</button>
+              <button type="submit" name="_save_action" value="add_another" class="btn btn-outline-success">Lưu và thêm mới</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(function() {
+  var defaultCenter = [10.7984, 106.6655];
+  var latInput = document.getElementById('id_latitude');
+  var lngInput = document.getElementById('id_longitude');
+  var startLat = latInput && latInput.value ? parseFloat(latInput.value) : null;
+  var startLng = lngInput && lngInput.value ? parseFloat(lngInput.value) : null;
+  var map = L.map('map').setView((startLat && startLng) ? [startLat, startLng] : defaultCenter, (startLat && startLng) ? 20 : 18);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+  var marker = null;
+  function updateInputs(lat, lng) { if (latInput) latInput.value = lat.toFixed(6); if (lngInput) lngInput.value = lng.toFixed(6); }
+  if (startLat && startLng) {
+    marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
+    marker.on('dragend', function(e) { var p = e.target.getLatLng(); updateInputs(p.lat, p.lng); });
+  }
+  map.on('click', function(e) {
+    var lat = e.latlng.lat, lng = e.latlng.lng;
+    if (!marker) { marker = L.marker([lat, lng], { draggable: true }).addTo(map); marker.on('dragend', function(ev) { var p = ev.target.getLatLng(); updateInputs(p.lat, p.lng); }); }
+    else marker.setLatLng([lat, lng]);
+    updateInputs(lat, lng);
+  });
+})();
+</script>
+{% endblock %}

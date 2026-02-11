@@ -1,0 +1,92 @@
+{% extends "home/admin_base.html" %}
+
+{% block title %}Quản lý thiết bị{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="{% url 'admin_dashboard' %}">Admin</a> / Thiết bị
+{% endblock %}
+
+{% block content %}
+<div class="card card-admin mb-4">
+  <div class="card-admin-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h5 class="mb-0">Thiết bị</h5>
+      <small class="d-block mt-1">Chọn mã hoặc nút Sửa để thay đổi. Có tọa độ sẽ hiển thị trên bản đồ.</small>
+    </div>
+    <a href="{% url 'admin_equipment_add' %}" class="btn btn-light btn-sm">+ Thêm thiết bị</a>
+  </div>
+  <div class="card-body">
+    {% if page_obj %}<p class="text-muted small mb-2">Tổng: {{ page_obj.paginator.count }} thiết bị. Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}.</p>{% endif %}
+    <form method="get" class="row g-2 mb-3">
+      <div class="col-md-6">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo mã hoặc tên...">
+      </div>
+      <div class="col-md-4">
+        <select name="status" class="form-select">
+          <option value="">-- Tất cả trạng thái --</option>
+          <option value="good" {% if status_filter == 'good' %}selected{% endif %}>Tốt</option>
+          <option value="broken" {% if status_filter == 'broken' %}selected{% endif %}>Hỏng</option>
+          <option value="maintenance" {% if status_filter == 'maintenance' %}selected{% endif %}>Đang sửa</option>
+        </select>
+      </div>
+      <div class="col-md-2 d-grid">
+        <button class="btn btn-admin-primary" type="submit">Lọc</button>
+      </div>
+    </form>
+    <form method="post">
+      {% csrf_token %}
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <select name="action" class="form-select form-select-sm" style="width: 220px;">
+          <option value="">-- Hành động --</option>
+          <option value="delete_selected">Xóa các mục đã chọn</option>
+        </select>
+        <button type="submit" class="btn btn-outline-success btn-sm">Thực hiện</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 32px;"><input type="checkbox" data-admin-select-all></th>
+            <th>Mã</th>
+            <th>Tên</th>
+            <th>Loại</th>
+            <th>Trạng thái</th>
+            <th>Phòng</th>
+            <th>Vị trí</th>
+            <th class="text-end">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for eq in equipment_list %}
+          <tr style="cursor: pointer;" data-href="{% url 'admin_equipment_edit' eq.pk %}">
+            <td onclick="event.stopPropagation();"><input type="checkbox" name="_selected_action" value="{{ eq.pk }}"></td>
+            <td><a href="{% url 'admin_equipment_edit' eq.pk %}" class="text-decoration-none fw-semibold text-success">{{ eq.code }}</a></td>
+            <td>{{ eq.name }}</td>
+            <td>{{ eq.equipment_type }}</td>
+            <td>{{ eq.get_status_display }}</td>
+            <td>{{ eq.room|default:"-" }}</td>
+            <td>
+              {% if eq.geom %}<span class="badge bg-success">Có tọa độ</span>{% else %}<span class="badge bg-secondary">Chưa có</span>{% endif %}
+            </td>
+            <td class="text-end" onclick="event.stopPropagation();">
+              <a href="{% url 'admin_equipment_edit' eq.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
+              <a href="{% url 'admin_equipment_delete' eq.pk %}" class="btn btn-outline-danger btn-sm">Xóa</a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center text-muted">Chưa có thiết bị nào. Nhấn «Thêm thiết bị» để tạo mới.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    </form>
+    {% if is_paginated %}
+    <nav class="mt-3"><ul class="pagination pagination-sm mb-0">
+      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&status={{ status_filter }}">«</a></li>{% endif %}
+      <li class="page-item disabled"><span class="page-link">Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ q }}&status={{ status_filter }}">»</a></li>{% endif %}
+    </ul></nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -19,10 +19,11 @@ from django.urls import path, include
 from home import views as core_views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Custom admin (admin-dashboard, admin/users/, admin/buildings/, ...) must come first
     path('', include('home.urls')),
-    path('map/', core_views.map_view, name='map_view'),  # Đường dẫn vào bản đồ
-    # Đăng xuất: dùng view custom, luôn quay về /login/
+    path('map/', core_views.map_view, name='map_view'),
     path('logout/', core_views.logout_view, name='logout'),
+    # Django built-in admin at /django-admin/ (optional; you can remove if not needed)
+    path('django-admin/', admin.site.urls),
 ]
 
