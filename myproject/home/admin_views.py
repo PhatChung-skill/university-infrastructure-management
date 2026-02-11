@@ -153,10 +153,15 @@ class EquipmentListView(AdminBulkDeleteMixin, ListView):
 
     def get_queryset(self):
         qs = Equipment.objects.select_related("room").order_by("code")
-        q = self.request.GET.get("q")
+        q = (self.request.GET.get("q") or "").strip()
         status = self.request.GET.get("status")
         if q:
-            qs = qs.filter(Q(code__icontains=q) | Q(name__icontains=q))
+            qs = qs.filter(
+                Q(code__icontains=q)
+                | Q(name__icontains=q)
+                | Q(equipment_type__icontains=q)
+                | Q(room__name__icontains=q)
+            )
         if status:
             qs = qs.filter(status=status)
         return qs
@@ -225,9 +230,29 @@ class RoomListView(AdminBulkDeleteMixin, ListView):
 
     def get_queryset(self):
         qs = Room.objects.select_related("building").order_by("name")
-        q = self.request.GET.get("q")
+        q = (self.request.GET.get("q") or "").strip()
         if q:
-            qs = qs.filter(name__icontains=q)
+            filters = Q(name__icontains=q) | Q(building__name__icontains=q)
+
+            # Tìm theo loại phòng bằng tiếng Việt (label choices)
+            q_lower = q.lower()
+            matching_types = [
+                code
+                for code, label in Room.ROOM_TYPES
+                if q_lower in label.lower()
+            ]
+            if matching_types:
+                filters |= Q(room_type__in=matching_types)
+
+            # Nếu q là số, cho phép tìm theo sức chứa
+            if q.isdigit():
+                try:
+                    capacity_val = int(q)
+                    filters |= Q(capacity=capacity_val)
+                except ValueError:
+                    pass
+
+            qs = qs.filter(filters)
         return qs
 
     def get_context_data(self, **kwargs):
@@ -352,10 +377,31 @@ class IncidentListView(AdminBulkDeleteMixin, ListView):
 
     def get_queryset(self):
         qs = Incident.objects.select_related("asset", "incident_type").order_by("-reported_at")
-        q = self.request.GET.get("q")
+        q = (self.request.GET.get("q") or "").strip()
         status = self.request.GET.get("status")
         if q:
-            qs = qs.filter(Q(title__icontains=q) | Q(description__icontains=q))
+            filters = Q(title__icontains=q) | Q(description__icontains=q)
+
+            # Tìm theo tài sản (code thiết bị, tên thiết bị, mã cây, loài cây)
+            filters |= Q(asset__equipment__code__icontains=q)
+            filters |= Q(asset__equipment__name__icontains=q)
+            filters |= Q(asset__tree__code__icontains=q)
+            filters |= Q(asset__tree__species__icontains=q)
+
+            # Tìm theo tên loại sự cố
+            filters |= Q(incident_type__name__icontains=q)
+
+            # Tìm theo mức độ ưu tiên (nhập chữ Thấp / Trung bình / Cao)
+            q_lower = q.lower()
+            matching_priorities = [
+                code
+                for code, label in Incident.PRIORITY
+                if q_lower in label.lower()
+            ]
+            if matching_priorities:
+                filters |= Q(priority__in=matching_priorities)
+
+            qs = qs.filter(filters)
         if status:
             qs = qs.filter(status=status)
         return qs

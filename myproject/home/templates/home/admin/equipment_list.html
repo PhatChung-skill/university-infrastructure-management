@@ -3,7 +3,7 @@
 {% block title %}Quản lý thiết bị{% endblock %}
 
 {% block breadcrumbs %}
-  <a href="{% url 'admin_dashboard' %}">Admin</a> / Thiết bị
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> / Thiết bị
 {% endblock %}
 
 {% block content %}
@@ -19,7 +19,7 @@
     {% if page_obj %}<p class="text-muted small mb-2">Tổng: {{ page_obj.paginator.count }} thiết bị. Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}.</p>{% endif %}
     <form method="get" class="row g-2 mb-3">
       <div class="col-md-6">
-        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo mã hoặc tên...">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo mã, tên, loại hoặc phòng...">
       </div>
       <div class="col-md-4">
         <select name="status" class="form-select">

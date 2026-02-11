@@ -3,7 +3,7 @@
 {% block title %}Quản lý phòng{% endblock %}
 
 {% block breadcrumbs %}
-  <a href="{% url 'admin_dashboard' %}">Admin</a> / Phòng
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> / Phòng
 {% endblock %}
 
 {% block content %}
@@ -18,7 +18,7 @@
   <div class="card-body">
     <form method="get" class="row g-2 mb-3">
       <div class="col-md-10">
-        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo tên phòng...">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo tên, loại phòng, tòa nhà hoặc sức chứa...">
       </div>
       <div class="col-md-2 d-grid">
         <button class="btn btn-admin-primary" type="submit">Tìm</button>

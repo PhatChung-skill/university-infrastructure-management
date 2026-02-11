@@ -3,7 +3,7 @@
 {% block title %}{% if object %}Sửa loại sự cố{% else %}Thêm loại sự cố{% endif %}{% endblock %}
 
 {% block breadcrumbs %}
-  <a href="{% url 'admin_dashboard' %}">Admin</a> /
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> /
   <a href="{% url 'admin_incident_type_list' %}">Loại sự cố</a> /
   {% if object %}Sửa{% else %}Thêm mới{% endif %}
 {% endblock %}

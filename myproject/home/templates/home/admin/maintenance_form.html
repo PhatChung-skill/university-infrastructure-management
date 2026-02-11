@@ -3,7 +3,7 @@
 {% block title %}{% if object %}Sửa phiếu bảo trì{% else %}Thêm phiếu bảo trì{% endif %}{% endblock %}
 
 {% block breadcrumbs %}
-  <a href="{% url 'admin_dashboard' %}">Admin</a> /
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> /
   <a href="{% url 'admin_maintenance_list' %}">Bảo trì</a> /
   {% if object %}Sửa{% else %}Thêm mới{% endif %}
 {% endblock %}

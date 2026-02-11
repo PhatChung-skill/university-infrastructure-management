@@ -13,6 +13,9 @@
     }
     .navbar-admin {
       background-color: #2e7d32;
+      position: sticky;
+      top: 0;
+      z-index: 1030;
     }
     .navbar-admin .navbar-brand,
     .navbar-admin .nav-link,
@@ -75,6 +78,11 @@
       background: linear-gradient(135deg, #2e7d32, #43a047);
       color: #fff;
     }
+    .admin-sidenav{
+      position: sticky;
+      top: 88px; /* dưới thanh điều hướng trên cùng */
+      align-self: flex-start;
+    }
     .admin-breadcrumb{
       font-size: .9rem;
       color: #2e7d32;
@@ -93,7 +101,7 @@
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}"
-               href="{% url 'admin_dashboard' %}">Dashboard</a>
+               href="{% url 'admin_dashboard' %}">Trang tổng quan</a>
           </li>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle {% if 'admin_building' in request.resolver_match.url_name or 'admin_room' in request.resolver_match.url_name or 'admin_tree' in request.resolver_match.url_name or 'admin_equipment' in request.resolver_match.url_name or 'admin_incident' in request.resolver_match.url_name %}active{% endif %}"
@@ -139,7 +147,7 @@
     <div class="admin-shell">
       <aside class="admin-sidenav">
         <div class="list-group">
-          <a class="list-group-item {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}" href="{% url 'admin_dashboard' %}">Dashboard</a>
+          <a class="list-group-item {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}" href="{% url 'admin_dashboard' %}">Trang tổng quan</a>
           <a class="list-group-item {% if 'admin_building' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_building_list' %}">Tòa nhà</a>
           <a class="list-group-item {% if 'admin_room' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_room_list' %}">Phòng</a>
           <a class="list-group-item {% if 'admin_tree' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_tree_list' %}">Cây xanh</a>
@@ -157,7 +165,7 @@
       <section>
         <div class="admin-breadcrumb mb-2">
           {% block breadcrumbs %}
-            <a href="{% url 'admin_dashboard' %}">Admin</a>
+            <a href="{% url 'admin_dashboard' %}">Trang quản trị</a>
           {% endblock %}
         </div>
         {% block content %}{% endblock %}

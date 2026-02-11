@@ -3,7 +3,7 @@
 {% block title %}{% if object %}Sửa tài sản{% else %}Thêm tài sản{% endif %}{% endblock %}
 
 {% block breadcrumbs %}
-  <a href="{% url 'admin_dashboard' %}">Admin</a> /
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> /
   <a href="{% url 'admin_asset_list' %}">Tài sản</a> /
   {% if object %}Sửa{% else %}Thêm mới{% endif %}
 {% endblock %}
@@ -24,11 +24,11 @@
             <label class="form-label">{{ form.asset_type.label }}</label>
             {{ form.asset_type }}{% for e in form.asset_type.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
-          <div class="mb-3">
+          <div class="mb-3" id="row_equipment">
             <label class="form-label">{{ form.equipment.label }}</label>
             {{ form.equipment }}{% for e in form.equipment.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
-          <div class="mb-3">
+          <div class="mb-3" id="row_tree">
             <label class="form-label">{{ form.tree.label }}</label>
             {{ form.tree }}{% for e in form.tree.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
@@ -45,4 +45,39 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const assetType = document.getElementById('id_asset_type');
+    const rowEquipment = document.getElementById('row_equipment');
+    const rowTree = document.getElementById('row_tree');
+    const fieldEquipment = document.getElementById('id_equipment');
+    const fieldTree = document.getElementById('id_tree');
+
+    function updateAssetFieldsVisibility() {
+      if (!assetType) return;
+      const value = assetType.value;
+
+      if (value === 'equipment') {
+        if (rowEquipment) rowEquipment.style.display = '';
+        if (rowTree) rowTree.style.display = 'none';
+        if (fieldTree) fieldTree.value = '';
+      } else if (value === 'tree') {
+        if (rowEquipment) rowEquipment.style.display = 'none';
+        if (rowTree) rowTree.style.display = '';
+        if (fieldEquipment) fieldEquipment.value = '';
+      } else {
+        if (rowEquipment) rowEquipment.style.display = '';
+        if (rowTree) rowTree.style.display = '';
+      }
+    }
+
+    if (assetType) {
+      assetType.addEventListener('change', updateAssetFieldsVisibility);
+      updateAssetFieldsVisibility();
+    }
+  });
+</script>
 {% endblock %}

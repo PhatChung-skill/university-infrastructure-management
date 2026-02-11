@@ -3,7 +3,7 @@
 {% block title %}{% if object %}Sửa tòa nhà{% else %}Thêm tòa nhà{% endif %}{% endblock %}
 
 {% block breadcrumbs %}
-  <a href="{% url 'admin_dashboard' %}">Admin</a> /
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> /
   <a href="{% url 'admin_building_list' %}">Tòa nhà</a> /
   {% if object %}Sửa{% else %}Thêm mới{% endif %}
 {% endblock %}
