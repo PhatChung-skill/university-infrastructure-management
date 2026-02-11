@@ -86,11 +86,24 @@
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
+        // --- B0. Cho phép mở map theo tọa độ từ URL (từ trang admin) ---
+        (function() {
+            var params = new URLSearchParams(window.location.search);
+            var lat = parseFloat(params.get('lat'));
+            var lng = parseFloat(params.get('lng'));
+            var zoom = parseInt(params.get('zoom') || '20', 10);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                map.setView([lat, lng], isNaN(zoom) ? 20 : zoom);
+            }
+        })();
+
         // --- C. Nhận dữ liệu từ Django View ---
         // Dữ liệu này được truyền từ views.py
         var buildingsData = {{ buildings_json|safe }};
         var treesData = {{ trees_json|safe }};
         var incidentsData = {{ incidents_json|safe }};
+        var roomsData = {{ rooms_json|safe }};
+        var equipmentData = {{ equipment_json|safe }};
 
         // --- D0. Mapping hiển thị tiếng Việt ---
         var VI_TREE_STATUS = {
@@ -138,15 +151,37 @@
             });
         }
 
-        // 3. Style Sự cố (Hình tròn nhấp nháy đỏ)
+        // 3. Style Sự cố (Hình tròn đỏ)
         function incidentPoint(feature, latlng) {
             return L.circleMarker(latlng, {
                 radius: 10,
-                fillColor: "#e74c3c", 
+                fillColor: "#e74c3c",
                 color: "#c0392b",
                 weight: 2,
                 opacity: 1,
                 fillOpacity: 0.8
+            });
+        }
+
+        // 4. Style Phòng (hình vuông tím)
+        function roomPoint(feature, latlng) {
+            return L.circleMarker(latlng, {
+                radius: 6,
+                fillColor: "#9b59b6",
+                color: "#fff",
+                weight: 1,
+                fillOpacity: 1
+            });
+        }
+
+        // 5. Style Thiết bị (hình tròn xanh dương)
+        function equipmentPoint(feature, latlng) {
+            return L.circleMarker(latlng, {
+                radius: 6,
+                fillColor: "#3498db",
+                color: "#2980b9",
+                weight: 1,
+                fillOpacity: 1
             });
         }
 
@@ -193,10 +228,35 @@
             }
         }).addTo(map);
 
+        // Lớp Phòng
+        var roomsLayer = L.geoJSON(roomsData, {
+            pointToLayer: roomPoint,
+            onEachFeature: function (feature, layer) {
+                layer.bindPopup(
+                    "<b>🚪 Phòng: " + (feature.properties.name || "") + "</b>"
+                    + "<br>Loại: " + (feature.properties.room_type || "")
+                );
+            }
+        }).addTo(map);
+
+        // Lớp Thiết bị
+        var equipmentLayer = L.geoJSON(equipmentData, {
+            pointToLayer: equipmentPoint,
+            onEachFeature: function (feature, layer) {
+                layer.bindPopup(
+                    "<b>⚙️ Thiết bị: " + (feature.properties.code || "") + "</b>"
+                    + "<br>Tên: " + (feature.properties.name || "")
+                    + "<br>Trạng thái: " + (feature.properties.status || "")
+                );
+            }
+        }).addTo(map);
+
         // --- F. Bộ điều khiển Layer ---
         var overlayMaps = {
             "Tòa nhà": buildingsLayer,
+            "Phòng": roomsLayer,
             "Cây xanh": treesLayer,
+            "Thiết bị": equipmentLayer,
             "Sự cố": incidentsLayer
         };
         L.control.layers(null, overlayMaps).addTo(map);

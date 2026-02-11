@@ -1,90 +1,72 @@
-{% load static %}
-<!doctype html>
-<html lang="vi">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Trang quản trị hệ thống</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body>
-  <!-- Thanh điều hướng -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-success">
-    <div class="container-fluid">
-      <a class="navbar-brand fw-semibold" href="#">Quản trị CSHT</a>
-      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarAdmin"
-              aria-controls="navbarAdmin" aria-expanded="false" aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span>
-      </button>
-      <div class="collapse navbar-collapse" id="navbarAdmin">
-        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-          <li class="nav-item">
-            <a class="nav-link active" aria-current="page" href="#">Dashboard</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="{% url 'map_view' %}">Bản đồ</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="/admin/" target="_blank">Django Admin</a>
-          </li>
-        </ul>
-        <span class="navbar-text me-3 text-white">
-          {{ request.user.username }}
-        </span>
-      </div>
-    </div>
-  </nav>
+{% extends "home/admin_base.html" %}
 
-  <!-- Nội dung chính -->
-  <main class="container py-4">
-    <div class="row">
-      <div class="col-12 mb-3">
-        <h2 class="fw-semibold">Xin chào, Admin</h2>
-        <p class="text-muted">
-          Bạn có toàn quyền quản lý hệ thống hạ tầng trường: tài sản, tòa nhà, cây xanh, thiết bị, sự cố, bảo trì...
+{% block title %}Trang quản trị hệ thống{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col-12">
+    <h2 class="fw-semibold">Xin chào, Admin</h2>
+    <p class="text-muted">
+      Bạn có toàn quyền quản lý hệ thống hạ tầng: tòa nhà, phòng, cây xanh, thiết bị, tài sản, sự cố, bảo trì, người dùng và vai trò.
+    </p>
+    <p class="small text-muted mb-0">
+      Dùng menu bên trái để vào từng mục (Tòa nhà, Phòng, Cây xanh, Thiết bị, Người dùng, …). Trong danh sách, nhấn vào tên/mã hoặc nút <strong>Sửa</strong> để mở trang sửa dữ liệu.
+    </p>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card card-admin h-100">
+      <div class="card-admin-header">
+        <h5 class="mb-0">Bản đồ hạ tầng</h5>
+      </div>
+      <div class="card-body">
+        <p class="small text-muted">
+          Xem toàn bộ tòa nhà, cây xanh, thiết bị và sự cố trên bản đồ. Dữ liệu có tọa độ sẽ hiển thị trên bản đồ.
         </p>
+        <a href="{% url 'map_view' %}" class="btn btn-admin-primary btn-sm">Mở bản đồ</a>
       </div>
     </div>
+  </div>
 
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body">
-            <h5 class="card-title text-success">Quản lý bản đồ</h5>
-            <p class="card-text small text-muted">
-              Xem nhanh toàn bộ tòa nhà, cây xanh, thiết bị và các sự cố trên bản đồ tương tác.
-            </p>
-            <a href="{% url 'map_view' %}" class="btn btn-outline-success btn-sm">Mở bản đồ</a>
-          </div>
-        </div>
+  <div class="col-md-4">
+    <div class="card card-admin h-100">
+      <div class="card-admin-header">
+        <h5 class="mb-0">Dữ liệu hạ tầng</h5>
       </div>
-
-      <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body">
-            <h5 class="card-title text-success">Quản lý dữ liệu</h5>
-            <p class="card-text small text-muted">
-              Truy cập trang Django Admin để cập nhật tòa nhà, phòng, tài sản, cây xanh, thiết bị, sự cố,...
-            </p>
-            <a href="/admin/" target="_blank" class="btn btn-outline-success btn-sm">Mở Django Admin</a>
-          </div>
-        </div>
-      </div>
-
-      <div class="col-md-4">
-        <div class="card border-0 shadow-sm h-100">
-          <div class="card-body">
-            <h5 class="card-title text-success">Phân quyền & người dùng</h5>
-            <p class="card-text small text-muted">
-              Sử dụng model Role & AppUser để cấu hình vai trò cho các nhân sự vận hành hệ thống.
-            </p>
-          </div>
+      <div class="card-body">
+        <p class="small text-muted">
+          Quản lý tòa nhà, phòng, cây xanh, thiết bị, loại sự cố, sự cố, tài sản, phiếu bảo trì.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'admin_building_list' %}" class="btn btn-outline-success btn-sm">Tòa nhà</a>
+          <a href="{% url 'admin_room_list' %}" class="btn btn-outline-success btn-sm">Phòng</a>
+          <a href="{% url 'admin_tree_list' %}" class="btn btn-outline-success btn-sm">Cây</a>
+          <a href="{% url 'admin_equipment_list' %}" class="btn btn-outline-success btn-sm">Thiết bị</a>
+          <a href="{% url 'admin_incident_list' %}" class="btn btn-outline-success btn-sm">Sự cố</a>
+          <a href="{% url 'admin_asset_list' %}" class="btn btn-outline-success btn-sm">Tài sản</a>
+          <a href="{% url 'admin_maintenance_list' %}" class="btn btn-outline-success btn-sm">Bảo trì</a>
         </div>
       </div>
     </div>
-  </main>
+  </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
-
+  <div class="col-md-4">
+    <div class="card card-admin h-100">
+      <div class="card-admin-header">
+        <h5 class="mb-0">Người dùng & vai trò</h5>
+      </div>
+      <div class="card-body">
+        <p class="small text-muted">
+          Quản lý vai trò (Role) và tài khoản AppUser để phân quyền truy cập dashboard.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'admin_role_list' %}" class="btn btn-outline-success btn-sm">Vai trò</a>
+          <a href="{% url 'admin_user_list' %}" class="btn btn-outline-success btn-sm">Người dùng</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
