@@ -1,0 +1,49 @@
+{% extends "home/admin_base.html" %}
+
+{% block title %}{% if object %}Sửa tòa nhà{% else %}Thêm tòa nhà{% endif %}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> /
+  <a href="{% url 'admin_building_list' %}">Tòa nhà</a> /
+  {% if object %}Sửa{% else %}Thêm mới{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    <div class="card card-admin">
+      <div class="card-admin-header">
+        <h5 class="mb-0">{% if object %}Sửa tòa nhà{% else %}Thêm tòa nhà mới{% endif %}</h5>
+        <small class="d-block mt-1">Nhập WKT POLYGON để hình dạng tòa nhà hiển thị trên bản đồ (hệ tọa độ WGS84).</small>
+      </div>
+      <div class="card-body p-4">
+        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">{{ form.name.label }}</label>
+            {{ form.name }}{% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ form.description.label }}</label>
+            {{ form.description }}{% for e in form.description.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ form.geom_wkt.label }}</label>
+            {{ form.geom_wkt }}{% for e in form.geom_wkt.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            <small class="text-muted d-block mt-1">Ví dụ: POLYGON((106.665 10.798, 106.666 10.798, 106.666 10.799, 106.665 10.799, 106.665 10.798))</small>
+          </div>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <a href="{% url 'admin_building_list' %}" class="btn btn-outline-secondary">Quay lại danh sách</a>
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+              <button type="submit" name="_save_action" value="save" class="btn btn-admin-primary">Lưu</button>
+              <button type="submit" name="_save_action" value="continue" class="btn btn-outline-success">Lưu và tiếp tục sửa</button>
+              <button type="submit" name="_save_action" value="add_another" class="btn btn-outline-success">Lưu và thêm mới</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

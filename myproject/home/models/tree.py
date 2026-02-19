@@ -3,9 +3,9 @@ from django.contrib.gis.db import models
 
 class Tree(models.Model):
     HEALTH_STATUS = [
-        ('good', 'Good'),
-        ('diseased', 'Diseased'),
-        ('dangerous', 'Dangerous'),
+        ("good", "Tốt"),
+        ("diseased", "Bệnh"),
+        ("dangerous", "Nguy hiểm"),
     ]
 
     code = models.CharField(max_length=50, unique=True)

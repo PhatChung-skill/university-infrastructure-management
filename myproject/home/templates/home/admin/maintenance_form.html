@@ -1,0 +1,65 @@
+{% extends "home/admin_base.html" %}
+
+{% block title %}{% if object %}Sửa phiếu bảo trì{% else %}Thêm phiếu bảo trì{% endif %}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> /
+  <a href="{% url 'admin_maintenance_list' %}">Bảo trì</a> /
+  {% if object %}Sửa{% else %}Thêm mới{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card card-admin">
+      <div class="card-admin-header">
+        <h5 class="mb-0">{% if object %}Sửa phiếu bảo trì{% else %}Thêm phiếu bảo trì mới{% endif %}</h5>
+      </div>
+      <div class="card-body p-4">
+        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.asset.label }}</label>
+              {{ form.asset }}{% for e in form.asset.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.staff.label }}</label>
+              {{ form.staff }}{% for e in form.staff.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.maintenance_type.label }}</label>
+              {{ form.maintenance_type }}{% for e in form.maintenance_type.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.maintenance_date.label }}</label>
+              {{ form.maintenance_date }}{% for e in form.maintenance_date.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.cost.label }}</label>
+              {{ form.cost }}{% for e in form.cost.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ form.note.label }}</label>
+            {{ form.note }}{% for e in form.note.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <a href="{% url 'admin_maintenance_list' %}" class="btn btn-outline-secondary">Quay lại danh sách</a>
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+              <button type="submit" name="_save_action" value="save" class="btn btn-admin-primary">Lưu</button>
+              <button type="submit" name="_save_action" value="continue" class="btn btn-outline-success">Lưu và tiếp tục sửa</button>
+              <button type="submit" name="_save_action" value="add_another" class="btn btn-outline-success">Lưu và thêm mới</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

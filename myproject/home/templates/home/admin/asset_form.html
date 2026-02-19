@@ -1,0 +1,83 @@
+{% extends "home/admin_base.html" %}
+
+{% block title %}{% if object %}Sửa tài sản{% else %}Thêm tài sản{% endif %}{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> /
+  <a href="{% url 'admin_asset_list' %}">Tài sản</a> /
+  {% if object %}Sửa{% else %}Thêm mới{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-8">
+    <div class="card card-admin">
+      <div class="card-admin-header">
+        <h5 class="mb-0">{% if object %}Sửa tài sản{% else %}Thêm tài sản mới{% endif %}</h5>
+        <small class="d-block mt-1">Chọn loại tài sản (thiết bị hoặc cây) và gắn đúng một đối tượng.</small>
+      </div>
+      <div class="card-body p-4">
+        {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+        <form method="post" novalidate>
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">{{ form.asset_type.label }}</label>
+            {{ form.asset_type }}{% for e in form.asset_type.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3" id="row_equipment">
+            <label class="form-label">{{ form.equipment.label }}</label>
+            {{ form.equipment }}{% for e in form.equipment.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3" id="row_tree">
+            <label class="form-label">{{ form.tree.label }}</label>
+            {{ form.tree }}{% for e in form.tree.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <a href="{% url 'admin_asset_list' %}" class="btn btn-outline-secondary">Quay lại danh sách</a>
+            <div class="d-flex flex-wrap gap-2 justify-content-end">
+              <button type="submit" name="_save_action" value="save" class="btn btn-admin-primary">Lưu</button>
+              <button type="submit" name="_save_action" value="continue" class="btn btn-outline-success">Lưu và tiếp tục sửa</button>
+              <button type="submit" name="_save_action" value="add_another" class="btn btn-outline-success">Lưu và thêm mới</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const assetType = document.getElementById('id_asset_type');
+    const rowEquipment = document.getElementById('row_equipment');
+    const rowTree = document.getElementById('row_tree');
+    const fieldEquipment = document.getElementById('id_equipment');
+    const fieldTree = document.getElementById('id_tree');
+
+    function updateAssetFieldsVisibility() {
+      if (!assetType) return;
+      const value = assetType.value;
+
+      if (value === 'equipment') {
+        if (rowEquipment) rowEquipment.style.display = '';
+        if (rowTree) rowTree.style.display = 'none';
+        if (fieldTree) fieldTree.value = '';
+      } else if (value === 'tree') {
+        if (rowEquipment) rowEquipment.style.display = 'none';
+        if (rowTree) rowTree.style.display = '';
+        if (fieldEquipment) fieldEquipment.value = '';
+      } else {
+        if (rowEquipment) rowEquipment.style.display = '';
+        if (rowTree) rowTree.style.display = '';
+      }
+    }
+
+    if (assetType) {
+      assetType.addEventListener('change', updateAssetFieldsVisibility);
+      updateAssetFieldsVisibility();
+    }
+  });
+</script>
+{% endblock %}

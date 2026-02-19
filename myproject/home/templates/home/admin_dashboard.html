@@ -1,0 +1,72 @@
+{% extends "home/admin_base.html" %}
+
+{% block title %}Trang quản trị hệ thống{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="col-12">
+    <h2 class="fw-semibold">Xin chào, Quản trị viên</h2>
+    <p class="text-muted">
+      Bạn có toàn quyền quản lý hệ thống hạ tầng: tòa nhà, phòng, cây xanh, thiết bị, tài sản, sự cố, bảo trì, người dùng và vai trò.
+    </p>
+    <p class="small text-muted mb-0">
+      Dùng menu bên trái để vào từng mục (Tòa nhà, Phòng, Cây xanh, Thiết bị, Người dùng, …). Trong danh sách, nhấn vào tên/mã hoặc nút <strong>Sửa</strong> để mở trang sửa dữ liệu.
+    </p>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card card-admin h-100">
+      <div class="card-admin-header">
+        <h5 class="mb-0">Bản đồ hạ tầng</h5>
+      </div>
+      <div class="card-body">
+        <p class="small text-muted">
+          Xem toàn bộ tòa nhà, cây xanh, thiết bị và sự cố trên bản đồ. Dữ liệu có tọa độ sẽ hiển thị trên bản đồ.
+        </p>
+        <a href="{% url 'map_view' %}" class="btn btn-admin-primary btn-sm">Mở bản đồ</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card card-admin h-100">
+      <div class="card-admin-header">
+        <h5 class="mb-0">Dữ liệu hạ tầng</h5>
+      </div>
+      <div class="card-body">
+        <p class="small text-muted">
+          Quản lý tòa nhà, phòng, cây xanh, thiết bị, loại sự cố, sự cố, tài sản, phiếu bảo trì.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'admin_building_list' %}" class="btn btn-outline-success btn-sm">Tòa nhà</a>
+          <a href="{% url 'admin_room_list' %}" class="btn btn-outline-success btn-sm">Phòng</a>
+          <a href="{% url 'admin_tree_list' %}" class="btn btn-outline-success btn-sm">Cây</a>
+          <a href="{% url 'admin_equipment_list' %}" class="btn btn-outline-success btn-sm">Thiết bị</a>
+          <a href="{% url 'admin_incident_list' %}" class="btn btn-outline-success btn-sm">Sự cố</a>
+          <a href="{% url 'admin_asset_list' %}" class="btn btn-outline-success btn-sm">Tài sản</a>
+          <a href="{% url 'admin_maintenance_list' %}" class="btn btn-outline-success btn-sm">Bảo trì</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card card-admin h-100">
+      <div class="card-admin-header">
+        <h5 class="mb-0">Người dùng & vai trò</h5>
+      </div>
+      <div class="card-body">
+        <p class="small text-muted">
+          Quản lý vai trò và tài khoản người dùng nội bộ để phân quyền truy cập trang quản trị.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'admin_role_list' %}" class="btn btn-outline-success btn-sm">Vai trò</a>
+          <a href="{% url 'admin_user_list' %}" class="btn btn-outline-success btn-sm">Người dùng</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

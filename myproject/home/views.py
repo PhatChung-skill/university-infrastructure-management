@@ -40,15 +40,15 @@ class Login(LoginView):
         user = self.request.user
         app_user = AppUser.objects.select_related("role").filter(username=user.username).first()
 
-        # 1. Ưu tiên tài khoản admin của Django (superuser / staff)
+        # 1. Ưu tiên tài khoản admin của Django (superuser / staff) → custom admin
         if user.is_superuser or user.is_staff:
-            return reverse("admin:index")
+            return reverse("admin_dashboard")
 
         # 2. Hoặc người dùng có role trong bảng AppUser/Role
         if app_user and app_user.role:
             role_name = app_user.role.name.lower()
             if role_name == "admin":
-                return reverse("admin:index")
+                return reverse("admin_dashboard")
             # Nhân viên CSVC: chấp nhận cả tên role tiếng Anh và tiếng Việt
             if role_name in ("facility_staff", "nhân viên csvc"):
                 return reverse("facility_dashboard")
@@ -75,6 +75,14 @@ def map_view(request):
                                   geometry_field='geom',
                                   fields=('title', 'status', 'priority'))
 
+    rooms_geojson = serialize('geojson', Room.objects.exclude(geom__isnull=True),
+                              geometry_field='geom',
+                              fields=('name', 'room_type'))
+
+    equipment_geojson = serialize('geojson', Equipment.objects.exclude(geom__isnull=True),
+                                  geometry_field='geom',
+                                  fields=('code', 'name', 'status'))
+
     # 2. Xác định nút quay lại phù hợp (Admin hoặc Nhân viên CSVC)
     back_url = None
     back_label = None
@@ -86,10 +94,10 @@ def map_view(request):
 
         role_name = app_user.role.name.lower() if app_user and app_user.role else None
 
-        # Admin Django hoặc role Admin
+        # Admin (custom admin dashboard)
         if request.user.is_superuser or request.user.is_staff or role_name == "admin":
-            back_url = reverse("admin:index")
-            back_label = "← Quay lại trang admin"
+            back_url = reverse("admin_dashboard")
+            back_label = "← Quay lại trang quản trị"
         # Nhân viên CSVC (cả tiếng Anh & tiếng Việt)
         elif role_name in ("facility_staff", "nhân viên csvc"):
             back_url = reverse("facility_dashboard")
@@ -104,23 +112,23 @@ def map_view(request):
         'buildings_json': buildings_geojson,
         'trees_json': trees_geojson,
         'incidents_json': incidents_geojson,
+        'rooms_json': rooms_geojson,
+        'equipment_json': equipment_geojson,
         'back_url': back_url,
         'back_label': back_label,
     }
     return render(request, 'home/map.html', context)
 
 
-@login_required
+from .decorators import admin_required
+
+
+@admin_required
 def admin_dashboard(request):
     """
     Trang quản trị hệ thống dành cho role 'Admin'.
     Nếu user không phải Admin thì tự động chuyển về trang bản đồ.
     """
-    app_user = AppUser.objects.select_related("role").filter(username=request.user.username).first()
-
-    if not (app_user and app_user.role and app_user.role.name.lower() == "admin"):
-        return redirect("map_view")
-
     return render(request, "home/admin_dashboard.html")
 
 
