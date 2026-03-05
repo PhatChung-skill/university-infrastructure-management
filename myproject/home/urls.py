@@ -6,6 +6,9 @@ from .views import (
     facility_dashboard,
     facility_incident,
     teacher_dashboard,
+    radius_search,
+    dangerous_trees_near_rooms,
+    devices_to_check,
 )
 from . import admin_views
 
@@ -77,4 +80,9 @@ urlpatterns = [
     path('admin/users/add/', admin_views.AppUserCreateView.as_view(), name='admin_user_add'),
     path('admin/users/<int:pk>/edit/', admin_views.AppUserUpdateView.as_view(), name='admin_user_edit'),
     path('admin/users/<int:pk>/delete/', admin_views.AppUserDeleteView.as_view(), name='admin_user_delete'),
+
+    # API GIS / truy vấn không gian
+    path('api/spatial/radius-search/', radius_search, name='radius_search'),
+    path('api/spatial/dangerous-trees/', dangerous_trees_near_rooms, name='dangerous_trees'),
+    path('api/spatial/devices-to-check/', devices_to_check, name='devices_to_check'),
 ]

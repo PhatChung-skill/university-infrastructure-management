@@ -5,13 +5,17 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth import logout
 from django.urls import reverse
 from django.contrib import messages
+from django.http import JsonResponse
+
+from django.core.serializers import serialize
+from django.contrib.gis.geos import Point
+from django.contrib.gis.measure import D
 
 from .forms import (
     BootstrapAuthenticationForm,
     FacilityMaintenanceForm,
     FacilityIncidentForm,
 )
-from django.core.serializers import serialize
 from .models import (
     Building,
     Tree,
@@ -22,6 +26,7 @@ from .models import (
     Maintenance,
     Room,
 )
+import json
 
 
 class Login(LoginView):
@@ -71,9 +76,45 @@ def map_view(request):
                               geometry_field='geom', 
                               fields=('code', 'species', 'health_status'))
     
-    incidents_geojson = serialize('geojson', Incident.objects.all(),
-                                  geometry_field='geom',
-                                  fields=('title', 'status', 'priority'))
+    # Incidents: tự build GeoJSON để thêm thông tin loại sự cố, loại tài sản, tên tài sản
+    VI_PRIORITY = {"low": "Thấp", "medium": "Trung bình", "high": "Cao"}
+    VI_STATUS = {"open": "Mở", "processing": "Đang xử lý", "closed": "Đã đóng"}
+    incidents_features = []
+    for inc in Incident.objects.select_related("incident_type", "asset", "asset__equipment", "asset__tree").all():
+        if not inc.geom:
+            continue
+        geom = json.loads(inc.geom.geojson)
+        asset = inc.asset
+        asset_search = []
+        if asset:
+            if asset.asset_type == "equipment" and asset.equipment:
+                e = asset.equipment
+                asset_search = [e.name or "", e.code or "", e.equipment_type or ""]
+            elif asset.asset_type == "tree" and asset.tree:
+                t = asset.tree
+                asset_search = [t.species or "", t.code or ""]
+        asset_search_text = " ".join(s.strip() for s in asset_search if s).strip()
+        props = {
+            "title": inc.title,
+            "status": inc.status,
+            "priority": inc.priority,
+            "vi_priority": VI_PRIORITY.get(inc.priority, inc.priority),
+            "vi_status": VI_STATUS.get(inc.status, inc.status),
+            "incident_type": inc.incident_type.name if inc.incident_type else "",
+            "incident_type_code": inc.incident_type.code if inc.incident_type else "",
+            "asset_type": asset.asset_type if asset else "",
+            "asset_search_text": asset_search_text,
+        }
+        incidents_features.append(
+            {
+                "type": "Feature",
+                "geometry": geom,
+                "properties": props,
+            }
+        )
+    incidents_geojson = json.dumps(
+        {"type": "FeatureCollection", "features": incidents_features}
+    )
 
     rooms_geojson = serialize('geojson', Room.objects.exclude(geom__isnull=True),
                               geometry_field='geom',
@@ -118,6 +159,153 @@ def map_view(request):
         'back_label': back_label,
     }
     return render(request, 'home/map.html', context)
+
+
+@login_required
+def radius_search(request):
+    """
+    Truy vấn bán kính quanh 1 điểm (cây, thiết bị, phòng).
+    Nhận tham số: lat, lng, radius (m), layers (vd: trees,devices,rooms).
+    Trả về GeoJSON cho từng lớp trong bán kính đó.
+    """
+    try:
+        lat = float(request.GET.get("lat"))
+        lng = float(request.GET.get("lng"))
+        radius = float(request.GET.get("radius", "20"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Tham số lat/lng/radius không hợp lệ."}, status=400)
+
+    point = Point(lng, lat, srid=4326)
+    layers_param = request.GET.get("layers", "trees,devices,rooms")
+    layer_names = {name.strip() for name in layers_param.split(",") if name.strip()}
+
+    result = {}
+
+    def to_feature_collection(objs, geom_attr="geom", extra_props=None):
+        features = []
+        for obj in objs:
+            geom = getattr(obj, geom_attr, None)
+            if not geom:
+                continue
+            props = {}
+            if isinstance(obj, Tree):
+                props = {
+                    "id": obj.id,
+                    "type": "tree",
+                    "code": obj.code,
+                    "species": obj.species,
+                    "health_status": obj.health_status,
+                }
+            elif isinstance(obj, Equipment):
+                props = {
+                    "id": obj.id,
+                    "type": "equipment",
+                    "code": obj.code,
+                    "name": obj.name,
+                    "status": obj.status,
+                }
+            elif isinstance(obj, Room):
+                props = {
+                    "id": obj.id,
+                    "type": "room",
+                    "name": obj.name,
+                    "room_type": obj.room_type,
+                }
+            if extra_props:
+                props.update(extra_props(obj))
+            features.append(
+                {
+                    "type": "Feature",
+                    "geometry": json.loads(geom.geojson),
+                    "properties": props,
+                }
+            )
+        return {"type": "FeatureCollection", "features": features}
+
+    if "trees" in layer_names:
+        trees_qs = Tree.objects.filter(geom__distance_lte=(point, D(m=radius)))
+        result["trees"] = to_feature_collection(trees_qs)
+
+    if "devices" in layer_names or "equipment" in layer_names:
+        equip_qs = Equipment.objects.filter(geom__distance_lte=(point, D(m=radius)))
+        result["equipment"] = to_feature_collection(equip_qs)
+
+    if "rooms" in layer_names:
+        rooms_qs = Room.objects.exclude(geom__isnull=True).filter(
+            geom__distance_lte=(point, D(m=radius))
+        )
+        result["rooms"] = to_feature_collection(rooms_qs)
+
+    return JsonResponse(result)
+
+
+@login_required
+def dangerous_trees_near_rooms(request):
+    """
+    Truy vấn tất cả cây có health_status='dangerous'.
+    Trả về FeatureCollection các cây nguy hiểm.
+    """
+    dangerous_trees = Tree.objects.filter(health_status="dangerous").exclude(geom__isnull=True)
+
+    features = []
+    for tree in dangerous_trees:
+        geom = tree.geom
+        if not geom:
+            continue
+        props = {
+            "id": tree.id,
+            "type": "tree",
+            "code": tree.code,
+            "species": tree.species,
+            "health_status": tree.health_status,
+        }
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": json.loads(geom.geojson),
+                "properties": props,
+            }
+        )
+
+    return JsonResponse({"type": "FeatureCollection", "features": features})
+
+
+@login_required
+def devices_to_check(request):
+    """
+    Truy vấn các thiết bị cần kiểm tra/bảo trì.
+    Ở đây định nghĩa đơn giản: thiết bị có status != 'good'.
+    Có thể mở rộng thêm điều kiện theo last_maintenance nếu cần.
+    """
+    devices_qs = (
+        Equipment.objects.exclude(geom__isnull=True)
+        .exclude(status="good")
+        .select_related("room")
+    )
+
+    features = []
+    for device in devices_qs:
+        geom = device.geom
+        if not geom:
+            continue
+        room = device.room
+        props = {
+            "id": device.id,
+            "type": "equipment",
+            "code": device.code,
+            "name": device.name,
+            "status": device.status,
+            "room_name": room.name if room else "",
+        }
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": json.loads(geom.geojson),
+                "properties": props,
+            }
+        )
+
+    return JsonResponse({"type": "FeatureCollection", "features": features})
 
 
 from .decorators import admin_required
