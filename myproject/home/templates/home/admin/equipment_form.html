@@ -101,18 +101,78 @@
   var startLng = lngInput && lngInput.value ? parseFloat(lngInput.value) : null;
   var map = L.map('map').setView((startLat && startLng) ? [startLat, startLng] : defaultCenter, (startLat && startLng) ? 20 : 18);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+  // Hiển thị lớp tòa nhà + phòng để đặt vị trí thiết bị chính xác
+  var buildingsData = {{ buildings_json|safe }};
+  var roomsData = {{ rooms_json|safe }};
   var marker = null;
   function updateInputs(lat, lng) { if (latInput) latInput.value = lat.toFixed(6); if (lngInput) lngInput.value = lng.toFixed(6); }
+  function setEquipmentMarker(lat, lng) {
+    if (!marker) {
+      marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on('dragend', function(ev) {
+        var p = ev.target.getLatLng();
+        updateInputs(p.lat, p.lng);
+      });
+    } else {
+      marker.setLatLng([lat, lng]);
+    }
+    updateInputs(lat, lng);
+  }
+
+  var buildingsLayer = L.geoJSON(buildingsData, {
+    style: {
+      color: "#1565c0",
+      weight: 2,
+      opacity: 1,
+      fillColor: "#42a5f5",
+      fillOpacity: 0.12
+    },
+    onEachFeature: function (feature, layer) {
+      var p = feature.properties || {};
+      layer.bindPopup("<b>🏢 " + (p.name || "Tòa nhà") + "</b><br>" + (p.description || ""));
+      layer.on('click', function(e) {
+        // Click trực tiếp tòa nhà => đặt vị trí thiết bị ngay điểm click
+        setEquipmentMarker(e.latlng.lat, e.latlng.lng);
+      });
+    }
+  }).addTo(map);
+
+  var roomsLayer = L.geoJSON(roomsData, {
+    style: {
+      color: "#6a1b9a",
+      weight: 2,
+      opacity: 1,
+      fillColor: "#9b59b6",
+      fillOpacity: 0.20
+    },
+    onEachFeature: function (feature, layer) {
+      var p = feature.properties || {};
+      layer.bindPopup("<b>🚪 " + (p.name || "Phòng") + "</b><br>Loại: " + (p.room_type || ""));
+      layer.on('click', function(e) {
+        // Click trực tiếp phòng => đặt vị trí thiết bị ngay điểm click
+        setEquipmentMarker(e.latlng.lat, e.latlng.lng);
+      });
+    }
+  }).addTo(map);
   if (startLat && startLng) {
-    marker = L.marker([startLat, startLng], { draggable: true }).addTo(map);
-    marker.on('dragend', function(e) { var p = e.target.getLatLng(); updateInputs(p.lat, p.lng); });
+    setEquipmentMarker(startLat, startLng);
   }
   map.on('click', function(e) {
     var lat = e.latlng.lat, lng = e.latlng.lng;
-    if (!marker) { marker = L.marker([lat, lng], { draggable: true }).addTo(map); marker.on('dragend', function(ev) { var p = ev.target.getLatLng(); updateInputs(p.lat, p.lng); }); }
-    else marker.setLatLng([lat, lng]);
-    updateInputs(lat, lng);
+    setEquipmentMarker(lat, lng);
   });
+
+  // Nếu chưa có vị trí thiết bị thì zoom theo phòng/tòa nhà để dễ đặt điểm
+  if (!(startLat && startLng)) {
+    try {
+      if (roomsLayer.getLayers().length) {
+        map.fitBounds(roomsLayer.getBounds(), { padding: [20, 20] });
+      } else if (buildingsLayer.getLayers().length) {
+        map.fitBounds(buildingsLayer.getBounds(), { padding: [20, 20] });
+      }
+    } catch (e) {}
+  }
 })();
 </script>
 {% endblock %}

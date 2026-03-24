@@ -4,11 +4,17 @@ so templates can use a Leaflet map to set coordinates.
 """
 from django import forms
 from django.contrib.gis.geos import Point, GEOSGeometry
+from django.core.files.storage import FileSystemStorage
+from django.conf import settings
+from django.core.validators import FileExtensionValidator
+from pathlib import Path
+import uuid
 from .models import (
     Tree,
     Equipment,
     Room,
     Building,
+    Floor,
     Incident,
     IncidentType,
     Asset,
@@ -89,14 +95,19 @@ class TreeAdminForm(forms.ModelForm):
         return obj
 
 
-# ----- Equipment (Point + Room FK) -----
+# ----- Equipment (Point + Room FK + Indoor Local XY) -----
 class EquipmentAdminForm(forms.ModelForm):
-    latitude = forms.FloatField(required=False, label="Vĩ độ", widget=forms.NumberInput(attrs={"step": "0.000001"}))
-    longitude = forms.FloatField(required=False, label="Kinh độ", widget=forms.NumberInput(attrs={"step": "0.000001"}))
+    latitude = forms.FloatField(required=False, label="Vĩ độ (Global)", widget=forms.NumberInput(attrs={"step": "0.000001"}))
+    longitude = forms.FloatField(required=False, label="Kinh độ (Global)", widget=forms.NumberInput(attrs={"step": "0.000001"}))
 
     class Meta:
         model = Equipment
-        fields = ["code", "name", "equipment_type", "status", "install_date", "last_maintenance", "room"]
+        # Cập nhật: Thêm local_x, local_y
+        fields = [
+            "code", "name", "equipment_type", "status", 
+            "install_date", "last_maintenance", "room", 
+            "local_x", "local_y"
+        ]
         labels = {
             "code": "Mã thiết bị",
             "name": "Tên thiết bị",
@@ -105,6 +116,8 @@ class EquipmentAdminForm(forms.ModelForm):
             "install_date": "Ngày lắp đặt",
             "last_maintenance": "Lần bảo trì gần nhất",
             "room": "Phòng",
+            "local_x": "Tọa độ X trong nhà (px)",
+            "local_y": "Tọa độ Y trong nhà (px)",
         }
         widgets = {
             "install_date": forms.DateInput(attrs={"type": "date"}),
@@ -121,10 +134,9 @@ class EquipmentAdminForm(forms.ModelForm):
     def clean(self):
         cleaned = super().clean()
         lat, lng = cleaned.get("latitude"), cleaned.get("longitude")
-        if lat is None or lng is None:
-            self.add_error("latitude", "Vui lòng chọn vị trí trên bản đồ hoặc nhập tọa độ.")
-            return cleaned
-        cleaned["geom"] = Point(float(lng), float(lat), srid=4326)
+        # Với thiết bị trong nhà, tọa độ lat/lng có thể không cần thiết nếu đã có local_x, local_y
+        if lat is not None and lng is not None:
+            cleaned["geom"] = Point(float(lng), float(lat), srid=4326)
         return cleaned
 
     def save(self, commit=True):
@@ -136,19 +148,37 @@ class EquipmentAdminForm(forms.ModelForm):
         return obj
 
 
-# ----- Room (Point + Building FK) -----
+# ----- Room (Polygon + Floor FK) -----
 class RoomAdminForm(forms.ModelForm):
-    latitude = forms.FloatField(required=False, label="Vĩ độ", widget=forms.NumberInput(attrs={"step": "0.000001"}))
-    longitude = forms.FloatField(required=False, label="Kinh độ", widget=forms.NumberInput(attrs={"step": "0.000001"}))
+    # Dùng FileField thay vì ImageField để không phụ thuộc Pillow (PIL)
+    blueprint_file = forms.FileField(
+        required=False,
+        label="Tải ảnh sơ đồ từ máy",
+        validators=[FileExtensionValidator(allowed_extensions=["jpg", "jpeg", "png", "webp", "gif"])],
+        widget=forms.ClearableFileInput(attrs={"accept": "image/*"}),
+    )
+    # Thay vì latitude/longitude, dùng WKT để vẽ Polygon cho Room
+    geom_wkt = forms.CharField(
+        required=False,
+        label="Hình dạng phòng (WKT Polygon)",
+        widget=forms.Textarea(attrs={"rows": 4, "placeholder": "POLYGON((106.665 10.798, 106.666 10.798, ...))"})
+    )
 
     class Meta:
         model = Room
-        fields = ["name", "room_type", "capacity", "building"]
+        # Cập nhật: Đổi building thành floor, bỏ status, thêm các trường blueprint
+        fields = [
+            "name", "room_type", "capacity", "floor", 
+            "blueprint_url", "blueprint_width", "blueprint_height"
+        ]
         labels = {
             "name": "Tên phòng",
             "room_type": "Loại phòng",
             "capacity": "Sức chứa",
-            "building": "Tòa nhà",
+            "floor": "Tầng", # Đổi nhãn
+            "blueprint_url": "Đường dẫn sơ đồ (URL)",
+            "blueprint_width": "Chiều rộng sơ đồ (px)",
+            "blueprint_height": "Chiều cao sơ đồ (px)",
         }
         widgets = {}
 
@@ -156,25 +186,59 @@ class RoomAdminForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         _add_bootstrap(self)
         if self.instance and self.instance.pk and self.instance.geom:
-            self.fields["latitude"].initial = self.instance.geom.y
-            self.fields["longitude"].initial = self.instance.geom.x
+            self.fields["geom_wkt"].initial = self.instance.geom.wkt
 
-    def clean(self):
-        cleaned = super().clean()
-        lat, lng = cleaned.get("latitude"), cleaned.get("longitude")
-        if lat is None or lng is None:
-            self.add_error("latitude", "Vui lòng chọn vị trí trên bản đồ hoặc nhập tọa độ.")
-            return cleaned
-        cleaned["geom"] = Point(float(lng), float(lat), srid=4326)
-        return cleaned
+    def clean_geom_wkt(self):
+        wkt = (self.cleaned_data.get("geom_wkt") or "").strip()
+        if not wkt:
+            if self.instance and self.instance.pk and self.instance.geom:
+                return self.instance.geom
+            raise forms.ValidationError("Vui lòng nhập WKT Polygon (hoặc vẽ trên bản đồ nếu có).")
+        try:
+            geom = GEOSGeometry(wkt, srid=4326)
+            if geom.geom_type != "Polygon":
+                raise forms.ValidationError("Chỉ chấp nhận POLYGON cho Phòng.")
+            return geom
+        except Exception as e:
+            raise forms.ValidationError(f"WKT không hợp lệ: {e}")
 
     def save(self, commit=True):
         obj = super().save(commit=False)
-        if self.cleaned_data.get("geom"):
-            obj.geom = self.cleaned_data["geom"]
+        geom = self.cleaned_data.get("geom_wkt")
+        if geom:
+            obj.geom = geom
+        uploaded = self.cleaned_data.get("blueprint_file")
+        if uploaded:
+            media_root = Path(getattr(settings, "MEDIA_ROOT", settings.BASE_DIR / "media"))
+            upload_dir = media_root / "blueprints"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            ext = Path(uploaded.name).suffix.lower() or ".png"
+            filename = f"room_{uuid.uuid4().hex}{ext}"
+            storage = FileSystemStorage(location=str(upload_dir), base_url=f"{settings.MEDIA_URL}blueprints/")
+            saved_name = storage.save(filename, uploaded)
+            obj.blueprint_url = storage.url(saved_name)
         if commit:
             obj.save()
         return obj
+
+# ----- Thêm mới: FloorAdminForm -----
+class FloorAdminForm(forms.ModelForm):
+    class Meta:
+        model = Floor
+        fields = ["name", "level", "building"]
+        labels = {
+            "name": "Tên tầng",
+            "level": "Cấp độ (Số tầng)",
+            "building": "Tòa nhà",
+        }
+        widgets = {
+            "name": forms.TextInput(attrs={"placeholder": "VD: Tầng 1, Tầng Trệt"}),
+            "level": forms.NumberInput(attrs={"placeholder": "VD: 1, 2, 3..."}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _add_bootstrap(self)
 
 
 # ----- Building (Polygon - WKT) -----

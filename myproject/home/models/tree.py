@@ -1,6 +1,5 @@
 from django.contrib.gis.db import models
 
-
 class Tree(models.Model):
     HEALTH_STATUS = [
         ("good", "Tốt"),
@@ -9,9 +8,9 @@ class Tree(models.Model):
     ]
 
     code = models.CharField(max_length=50, unique=True)
-    species = models.TextField()
+    species = models.TextField(null=True, blank=True)
     height = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
-    health_status = models.CharField(max_length=20, choices=HEALTH_STATUS)
+    health_status = models.CharField(max_length=20, choices=HEALTH_STATUS, null=True, blank=True)
     planted_date = models.DateField(null=True, blank=True)
     last_trimmed = models.DateField(null=True, blank=True)
     note = models.TextField(null=True, blank=True)

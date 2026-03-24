@@ -12,6 +12,9 @@
     <p class="small text-muted mb-0">
       Dùng menu bên trái để vào từng mục (Tòa nhà, Phòng, Cây xanh, Thiết bị, Người dùng, …). Trong danh sách, nhấn vào tên/mã hoặc nút <strong>Sửa</strong> để mở trang sửa dữ liệu.
     </p>
+    <p class="small text-muted mb-0 mt-1">
+      Riêng mục <strong>Phòng</strong> đã hỗ trợ tải ảnh sơ đồ trực tiếp từ máy (jpg/png/webp), tự động lưu và hiển thị preview.
+    </p>
   </div>
 </div>
 
@@ -41,6 +44,7 @@
         </p>
         <div class="d-flex flex-wrap gap-2">
           <a href="{% url 'admin_building_list' %}" class="btn btn-outline-success btn-sm">Tòa nhà</a>
+          <a href="{% url 'admin_floor_list' %}" class="btn btn-outline-success btn-sm">Tầng</a>
           <a href="{% url 'admin_room_list' %}" class="btn btn-outline-success btn-sm">Phòng</a>
           <a href="{% url 'admin_tree_list' %}" class="btn btn-outline-success btn-sm">Cây</a>
           <a href="{% url 'admin_equipment_list' %}" class="btn btn-outline-success btn-sm">Thiết bị</a>

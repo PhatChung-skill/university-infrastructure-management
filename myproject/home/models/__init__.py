@@ -1,5 +1,6 @@
 from .user import *
 from .building import *
+from .floor import *
 from .room import *
 from .tree import *
 from .equipment import *

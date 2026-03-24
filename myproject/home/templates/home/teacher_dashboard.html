@@ -101,7 +101,7 @@
                 <tbody>
                   {% for item in room_status_list %}
                     <tr>
-                      <td>{{ item.room.building.name }}</td>
+                      <td>{% if item.room.floor and item.room.floor.building %}{{ item.room.floor.building.name }}{% else %}-{% endif %}</td>
                       <td>{{ item.room.name }}</td>
                       <td>{{ item.room.get_room_type_display }}</td>
                       <td>{% if item.room.capacity %}{{ item.room.capacity }}{% else %}-{% endif %}</td>

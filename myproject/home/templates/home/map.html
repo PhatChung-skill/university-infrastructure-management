@@ -293,11 +293,11 @@
             <div class="legend-title">Khu vực / Phòng</div>
             <div class="legend-item">
                 <span class="color-box" style="background:#3498db;"></span>
-                <span>Tòa nhà</span>
+                <span>Tòa nhà (polygon xanh dương)</span>
             </div>
             <div class="legend-item">
                 <span class="color-box" style="background:#9b59b6;"></span>
-                <span>Phòng học / Phòng</span>
+                <span>Phòng (polygon tím)</span>
             </div>
         </div>
         <div class="legend-group">
@@ -316,22 +316,26 @@
 
     <script>
         // --- A. Khởi tạo bản đồ ---
-        // Tọa độ HCMUNRE (Lê Văn Sỹ): [10.7984, 106.6655]
-        var map = L.map('map').setView([10.7984, 106.6655], 18);
+        // Giữ zoom đủ gần nhưng vẫn còn nền tile (OSM native zoom ~19)
+        var map = L.map('map', { maxZoom: 22 }).setView([10.7984, 106.6655], 19);
 
         // --- B. Thêm lớp nền (Base Map) ---
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; OpenStreetMap contributors',
+            maxNativeZoom: 19,
+            maxZoom: 22
         }).addTo(map);
 
         // --- B0. Cho phép mở map theo tọa độ từ URL (từ trang admin) ---
+        var hasUrlFocus = false;
         (function() {
             var params = new URLSearchParams(window.location.search);
             var lat = parseFloat(params.get('lat'));
             var lng = parseFloat(params.get('lng'));
-            var zoom = parseInt(params.get('zoom') || '20', 10);
+            var zoom = parseInt(params.get('zoom') || '19', 10);
             if (!isNaN(lat) && !isNaN(lng)) {
-                map.setView([lat, lng], isNaN(zoom) ? 20 : zoom);
+                map.setView([lat, lng], isNaN(zoom) ? 19 : Math.min(zoom, 22));
+                hasUrlFocus = true;
             }
         })();
 
@@ -412,16 +416,14 @@
             });
         }
 
-        // 4. Style Phòng (hình vuông tím)
-        function roomPoint(feature, latlng) {
-            return L.circleMarker(latlng, {
-                radius: 6,
-                fillColor: "#9b59b6",
-                color: "#fff",
-                weight: 1,
-                fillOpacity: 1
-            });
-        }
+        // 4. Style Phòng (Polygon tím)
+        var roomStyle = {
+            "color": "#6a1b9a",
+            "weight": 2,
+            "opacity": 1,
+            "fillColor": "#9b59b6",
+            "fillOpacity": 0.35
+        };
 
         // 5. Style Thiết bị (màu theo trạng thái: tốt = xanh biển đậm, đang sửa = vàng, hỏng = đỏ đậm)
         var EQUIPMENT_COLORS = {
@@ -441,13 +443,60 @@
             });
         }
 
+        function viRoomType(code) {
+            var mapType = {
+                "classroom": "Phòng học",
+                "lab": "Phòng thí nghiệm",
+                "library": "Thư viện",
+                "office": "Văn phòng",
+                "hall": "Hội trường"
+            };
+            return mapType[code] || code || "";
+        }
+
+        function makeImageHtml(url, altText) {
+            if (!url) return "";
+            return (
+                "<div style='margin-top:8px'>" +
+                "<img src='" + url + "' alt='" + (altText || "image") + "' " +
+                "style='width:100%;max-width:240px;max-height:140px;object-fit:cover;border-radius:8px;border:1px solid #d7e0d7;'/>" +
+                "</div>"
+            );
+        }
+
+        function renderSelectedDetails(title, html) {
+            var el = document.getElementById("query-results");
+            if (!el) return;
+            el.innerHTML = "<strong>" + title + "</strong><div style='margin-top:6px'>" + html + "</div>";
+        }
+
+        var radiusMode = false;
+
+        function handleFeatureClick(e, detailTitle, detailHtml) {
+            // Nếu đang bật chế độ truy vấn bán kính thì click vào đối tượng sẽ dùng luôn làm tâm truy vấn
+            if (radiusMode) {
+                if (e && e.originalEvent) {
+                    L.DomEvent.stopPropagation(e.originalEvent);
+                }
+                radiusMode = false;
+                map.getContainer().style.cursor = "";
+                runRadiusSearchAt(e.latlng);
+                return;
+            }
+            renderSelectedDetails(detailTitle, detailHtml);
+        }
+
         // --- E. Thêm các lớp vào bản đồ ---
 
         // Lớp Tòa nhà
         var buildingsLayer = L.geoJSON(buildingsData, {
             style: buildingStyle,
             onEachFeature: function (feature, layer) {
-                layer.bindPopup("<b>🏢 " + feature.properties.name + "</b><br>" + feature.properties.description);
+                var html = "<b>🏢 " + (feature.properties.name || "") + "</b><br>" + (feature.properties.description || "");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết tòa nhà", html);
+                });
             }
         }).addTo(map);
 
@@ -459,11 +508,14 @@
                 var icon = "🌳";
                 if (status == 'dangerous') icon = "⚠️";
                 var viStatus = VI_TREE_STATUS[status] || status;
-                layer.bindPopup(
+                var html =
                     "<b>" + icon + " Cây: " + feature.properties.species + "</b>"
                     + "<br>Mã: " + feature.properties.code
-                    + "<br>Tình trạng: " + viStatus
-                );
+                    + "<br>Tình trạng: " + viStatus;
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết cây", html);
+                });
             }
         }).addTo(map);
 
@@ -476,22 +528,35 @@
                 var viPriority = VI_INCIDENT_PRIORITY[priority] || priority;
                 var viStatus = VI_INCIDENT_STATUS[status] || status;
                 var color = priority == 'high' ? 'red' : (priority == 'medium' ? '#f39c12' : '#2e7d32');
-                layer.bindPopup(
+                var p = feature.properties || {};
+                var html =
                     "<b>🔥 SỰ CỐ: " + feature.properties.title + "</b>"
                     + "<br>Mức độ: <span style='color:" + color + "'><b>" + viPriority + "</b></span>"
                     + "<br>Trạng thái: " + viStatus
-                );
+                    + "<br>Loại sự cố: " + (p.incident_type || "-")
+                    + makeImageHtml(p.image_url, "Hình ảnh liên quan sự cố");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết sự cố", html);
+                });
             }
         }).addTo(map);
 
         // Lớp Phòng
         var roomsLayer = L.geoJSON(roomsData, {
-            pointToLayer: roomPoint,
+            style: roomStyle,
             onEachFeature: function (feature, layer) {
-                layer.bindPopup(
+                var p = feature.properties || {};
+                var html =
                     "<b>🚪 Phòng: " + (feature.properties.name || "") + "</b>"
-                    + "<br>Loại: " + (feature.properties.room_type || "")
-                );
+                    + "<br>Loại: " + viRoomType(feature.properties.room_type)
+                    + "<br>Sức chứa: " + (p.capacity || "-")
+                    + "<br>Tầng/Tòa: " + ((p.floor_name || "") + (p.building_name ? " - " + p.building_name : ""))
+                    + makeImageHtml(p.blueprint_url, "Sơ đồ phòng");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết phòng", html);
+                });
             }
         }).addTo(map);
 
@@ -501,11 +566,17 @@
             onEachFeature: function (feature, layer) {
                 var st = feature.properties && feature.properties.status;
                 var viStatus = VI_EQUIPMENT_STATUS[st] || st || "";
-                layer.bindPopup(
+                var p = feature.properties || {};
+                var html =
                     "<b>⚙️ Thiết bị: " + (feature.properties.code || "") + "</b>"
                     + "<br>Tên: " + (feature.properties.name || "")
                     + "<br>Trạng thái: " + viStatus
-                );
+                    + "<br>Phòng/Tầng/Tòa: " + ((p.room_name || "") + (p.floor_name ? " - " + p.floor_name : "") + (p.building_name ? " - " + p.building_name : ""))
+                    + makeImageHtml(p.blueprint_url, "Sơ đồ phòng chứa thiết bị");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết thiết bị", html);
+                });
             }
         }).addTo(map);
 
@@ -522,6 +593,27 @@
             "Sự cố": incidentsLayer
         };
         L.control.layers(null, overlayMaps).addTo(map);
+
+        // Khi mở map: tự focus vào vùng có dữ liệu để không bị lệch khỏi khu vực hạ tầng
+        if (!hasUrlFocus) {
+            try {
+                var allDataGroup = L.featureGroup([
+                    buildingsLayer,
+                    roomsLayer,
+                    treesLayer,
+                    equipmentLayer,
+                    incidentsLayer
+                ]);
+                var b = allDataGroup.getBounds();
+                if (b && b.isValid()) {
+                    map.fitBounds(b, { padding: [30, 30], maxZoom: 19 });
+                } else {
+                    map.setView([10.7984, 106.6655], 19);
+                }
+            } catch (e) {
+                map.setView([10.7984, 106.6655], 19);
+            }
+        }
 
         // Helper: ẩn tất cả lớp trừ tòa nhà, chỉ giữ lại layer kết quả cần hiển thị
         function hideAllExceptBuildings() {
@@ -547,23 +639,9 @@
         }
 
         // --- G. Tool: Truy vấn bán kính ---
-        var radiusMode = false;
 
-        document.getElementById("btn-radius-search").addEventListener("click", function () {
-            radiusMode = true;
-            map.getContainer().style.cursor = "crosshair";
-            alert("Chế độ truy vấn bán kính: hãy click lên bản đồ để chọn tâm tìm kiếm.");
-        });
-
-        // Nút quay lại bản đồ gốc
-        document.getElementById("btn-show-all").addEventListener("click", function () {
-            showAllBaseLayers();
-        });
-
-        map.on("click", function (e) {
-            if (!radiusMode) return;
-            radiusMode = false;
-            map.getContainer().style.cursor = "";
+        function runRadiusSearchAt(latlng) {
+            if (!latlng) return;
 
             var radius = prompt("Nhập bán kính cần tìm (m):", "20");
             if (!radius) return;
@@ -644,9 +722,9 @@
             fetch(
                 radiusSearchUrl +
                     "?lat=" +
-                    encodeURIComponent(e.latlng.lat) +
+                    encodeURIComponent(latlng.lat) +
                     "&lng=" +
-                    encodeURIComponent(e.latlng.lng) +
+                    encodeURIComponent(latlng.lng) +
                     "&radius=" +
                     encodeURIComponent(radius) +
                     "&layers=" +
@@ -663,7 +741,7 @@
                     }
 
                     // Vẽ vòng tròn bán kính
-                    L.circle(e.latlng, {
+                    L.circle(latlng, {
                         radius: parseFloat(radius),
                         color: "#2e7d32",
                         weight: 2,
@@ -688,7 +766,7 @@
                                 var icon = "🌳";
                                 if (status == "dangerous") icon = "⚠️";
                                 var viStatus = VI_TREE_STATUS[status] || status;
-                                layer.bindPopup(
+                                var html =
                                     "<b>" +
                                         icon +
                                         " Cây: " +
@@ -697,8 +775,11 @@
                                         "<br>Mã: " +
                                         feature.properties.code +
                                         "<br>Tình trạng: " +
-                                        viStatus
-                                );
+                                        viStatus;
+                                layer.bindPopup(html);
+                                layer.on("click", function (e) {
+                                    handleFeatureClick(e, "Chi tiết cây (kết quả truy vấn)", html);
+                                });
                             },
                         }).addTo(radiusResultLayer);
                     }
@@ -716,30 +797,43 @@
                         L.geoJSON(filteredEquip, {
                             pointToLayer: equipmentPoint,
                             onEachFeature: function (feature, layer) {
-                                layer.bindPopup(
+                                var p = feature.properties || {};
+                                var viStatus = VI_EQUIPMENT_STATUS[p.status] || p.status || "";
+                                var html =
                                     "<b>⚙️ Thiết bị: " +
                                         (feature.properties.code || "") +
                                         "</b>" +
                                         "<br>Tên: " +
                                         (feature.properties.name || "") +
                                         "<br>Trạng thái: " +
-                                        (feature.properties.status || "")
-                                );
+                                        viStatus +
+                                        makeImageHtml(p.blueprint_url, "Sơ đồ phòng chứa thiết bị");
+                                layer.bindPopup(html);
+                                layer.on("click", function (e) {
+                                    handleFeatureClick(e, "Chi tiết thiết bị (kết quả truy vấn)", html);
+                                });
                             },
                         }).addTo(radiusResultLayer);
                     }
 
                     if (data.rooms) {
                         L.geoJSON(data.rooms, {
-                            pointToLayer: roomPoint,
+                            style: roomStyle,
                             onEachFeature: function (feature, layer) {
-                                layer.bindPopup(
+                                var p = feature.properties || {};
+                                var html =
                                     "<b>🚪 Phòng: " +
                                         (feature.properties.name || "") +
                                         "</b>" +
                                         "<br>Loại: " +
-                                        (feature.properties.room_type || "")
-                                );
+                                        viRoomType(feature.properties.room_type) +
+                                        "<br>Sức chứa: " + (p.capacity || "-") +
+                                        "<br>Tầng/Tòa: " + ((p.floor_name || "") + (p.building_name ? " - " + p.building_name : "")) +
+                                        makeImageHtml(p.blueprint_url, "Sơ đồ phòng");
+                                layer.bindPopup(html);
+                                layer.on("click", function (e) {
+                                    handleFeatureClick(e, "Chi tiết phòng (kết quả truy vấn)", html);
+                                });
                             },
                         }).addTo(radiusResultLayer);
                     }
@@ -748,6 +842,24 @@
                     console.error(err);
                     alert("Không truy vấn được dữ liệu bán kính.");
                 });
+        }
+
+        document.getElementById("btn-radius-search").addEventListener("click", function () {
+            radiusMode = true;
+            map.getContainer().style.cursor = "crosshair";
+            alert("Chế độ truy vấn bán kính: hãy click lên bản đồ hoặc click trực tiếp vào đối tượng để chọn tâm tìm kiếm.");
+        });
+
+        // Nút quay lại bản đồ gốc
+        document.getElementById("btn-show-all").addEventListener("click", function () {
+            showAllBaseLayers();
+        });
+
+        map.on("click", function (e) {
+            if (!radiusMode) return;
+            radiusMode = false;
+            map.getContainer().style.cursor = "";
+            runRadiusSearchAt(e.latlng);
         });
 
         // --- H. Tool: Truy vấn nâng cao (cây nguy hiểm / thiết bị cần kiểm tra) ---
@@ -838,9 +950,14 @@
                                             text +
                                             "</div>"
                                     );
-                                    layer.bindPopup(
-                                        "<b>Thiết bị cần kiểm tra</b><br>" + text
-                                    );
+                                    var html =
+                                        "<b>Thiết bị cần kiểm tra</b><br>" +
+                                        text +
+                                        makeImageHtml(p.blueprint_url, "Sơ đồ phòng chứa thiết bị");
+                                    layer.bindPopup(html);
+                                    layer.on("click", function (e) {
+                                        handleFeatureClick(e, "Chi tiết thiết bị cần kiểm tra", html);
+                                    });
                                 },
                             }).addTo(advancedResultLayer);
 
@@ -932,7 +1049,14 @@
                                 text +
                                 "</div>"
                         );
-                        layer.bindPopup("<b>Sự cố</b><br>" + text);
+                        var html =
+                            "<b>Sự cố</b><br>" +
+                            text +
+                            makeImageHtml(p.image_url, "Hình ảnh liên quan sự cố");
+                        layer.bindPopup(html);
+                        layer.on("click", function (e) {
+                            handleFeatureClick(e, "Chi tiết sự cố", html);
+                        });
                     },
                 }).addTo(advancedResultLayer);
 

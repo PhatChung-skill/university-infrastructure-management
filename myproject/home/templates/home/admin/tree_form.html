@@ -110,6 +110,16 @@
   );
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
 
+  // Hiển thị lớp tòa nhà + phòng để đặt vị trí cây chính xác
+  var buildingsData = {{ buildings_json|safe }};
+  var roomsData = {{ rooms_json|safe }};
+  var buildingsLayer = L.geoJSON(buildingsData, {
+    style: { color: "#1565c0", weight: 2, opacity: 1, fillColor: "#42a5f5", fillOpacity: 0.12 }
+  }).addTo(map);
+  var roomsLayer = L.geoJSON(roomsData, {
+    style: { color: "#6a1b9a", weight: 2, opacity: 1, fillColor: "#9b59b6", fillOpacity: 0.20 }
+  }).addTo(map);
+
   var marker = null;
   function updateInputs(lat, lng) {
     if (latInput) latInput.value = lat.toFixed(6);
@@ -129,6 +139,14 @@
     } else marker.setLatLng([lat, lng]);
     updateInputs(lat, lng);
   });
+
+  // Nếu chưa có vị trí cây thì zoom theo khu vực phòng/tòa nhà
+  if (!(startLat && startLng)) {
+    try {
+      if (roomsLayer.getLayers().length) map.fitBounds(roomsLayer.getBounds(), { padding: [20, 20] });
+      else if (buildingsLayer.getLayers().length) map.fitBounds(buildingsLayer.getBounds(), { padding: [20, 20] });
+    } catch (e) {}
+  }
 })();
 </script>
 {% endblock %}

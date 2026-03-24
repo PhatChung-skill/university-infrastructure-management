@@ -123,7 +123,7 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 DATABASES = {
     "default": {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'quan_ly_csht',
+        'NAME': 'School infrastructure management',
         'USER': 'postgres',
         'PASSWORD': '123',
         'HOST': 'localhost',
@@ -167,6 +167,8 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
 
 # settings.py
 

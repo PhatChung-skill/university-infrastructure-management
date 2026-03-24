@@ -27,6 +27,14 @@ urlpatterns = [
     path('admin/buildings/<int:pk>/edit/', admin_views.BuildingUpdateView.as_view(), name='admin_building_edit'),
     path('admin/buildings/<int:pk>/delete/', admin_views.BuildingDeleteView.as_view(), name='admin_building_delete'),
 
+    # ==========================================
+    # THÊM MỚI: Admin CRUD - Floors
+    # ==========================================
+    path('admin/floors/', admin_views.FloorListView.as_view(), name='admin_floor_list'),
+    path('admin/floors/add/', admin_views.FloorCreateView.as_view(), name='admin_floor_add'),
+    path('admin/floors/<int:pk>/edit/', admin_views.FloorUpdateView.as_view(), name='admin_floor_edit'),
+    path('admin/floors/<int:pk>/delete/', admin_views.FloorDeleteView.as_view(), name='admin_floor_delete'),
+
     # Admin CRUD - Rooms
     path('admin/rooms/', admin_views.RoomListView.as_view(), name='admin_room_list'),
     path('admin/rooms/add/', admin_views.RoomCreateView.as_view(), name='admin_room_add'),

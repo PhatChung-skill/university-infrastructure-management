@@ -95,6 +95,44 @@
   var startLng = lngInput && lngInput.value ? parseFloat(lngInput.value) : null;
   var map = L.map('map').setView((startLat && startLng) ? [startLat, startLng] : defaultCenter, (startLat && startLng) ? 20 : 18);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+  // Hiển thị lớp tòa nhà + phòng để đặt vị trí sự cố chính xác
+  var buildingsData = {{ buildings_json|safe }};
+  var roomsData = {{ rooms_json|safe }};
+  var treesData = {{ trees_json|safe }};
+  var equipmentData = {{ equipment_json|safe }};
+  var buildingsLayer = L.geoJSON(buildingsData, {
+    style: { color: "#1565c0", weight: 2, opacity: 1, fillColor: "#42a5f5", fillOpacity: 0.12 }
+  }).addTo(map);
+  var roomsLayer = L.geoJSON(roomsData, {
+    style: { color: "#6a1b9a", weight: 2, opacity: 1, fillColor: "#9b59b6", fillOpacity: 0.20 }
+  }).addTo(map);
+  var treesLayer = L.geoJSON(treesData, {
+    pointToLayer: function(feature, latlng) {
+      var st = feature.properties && feature.properties.health_status;
+      var color = "#27ae60";
+      if (st === "diseased") color = "#f39c12";
+      if (st === "dangerous") color = "#c0392b";
+      return L.circleMarker(latlng, { radius: 5, fillColor: color, color: "#fff", weight: 1, fillOpacity: 1 });
+    },
+    onEachFeature: function(feature, layer) {
+      var p = feature.properties || {};
+      layer.bindPopup("<b>🌳 " + (p.code || "") + "</b><br>" + (p.species || ""));
+    }
+  }).addTo(map);
+  var equipmentLayer = L.geoJSON(equipmentData, {
+    pointToLayer: function(feature, latlng) {
+      var st = feature.properties && feature.properties.status;
+      var fill = "#1565c0", stroke = "#0d47a1";
+      if (st === "maintenance") { fill = "#f9a825"; stroke = "#f57f17"; }
+      if (st === "broken") { fill = "#c62828"; stroke = "#b71c1c"; }
+      return L.circleMarker(latlng, { radius: 6, fillColor: fill, color: stroke, weight: 1, fillOpacity: 1 });
+    },
+    onEachFeature: function(feature, layer) {
+      var p = feature.properties || {};
+      layer.bindPopup("<b>⚙️ " + (p.code || "") + "</b><br>" + (p.name || "") + "<br>Trạng thái: " + (p.status || ""));
+    }
+  }).addTo(map);
   var marker = null;
   function updateInputs(lat, lng) { if (latInput) latInput.value = lat.toFixed(6); if (lngInput) lngInput.value = lng.toFixed(6); }
   if (startLat && startLng) {
@@ -107,6 +145,16 @@
     else marker.setLatLng([lat, lng]);
     updateInputs(lat, lng);
   });
+
+  // Nếu chưa có vị trí sự cố thì zoom theo khu vực phòng/tòa nhà
+  if (!(startLat && startLng)) {
+    try {
+      if (roomsLayer.getLayers().length) map.fitBounds(roomsLayer.getBounds(), { padding: [20, 20] });
+      else if (buildingsLayer.getLayers().length) map.fitBounds(buildingsLayer.getBounds(), { padding: [20, 20] });
+      else if (equipmentLayer.getLayers().length) map.fitBounds(equipmentLayer.getBounds(), { padding: [20, 20] });
+      else if (treesLayer.getLayers().length) map.fitBounds(treesLayer.getBounds(), { padding: [20, 20] });
+    } catch (e) {}
+  }
 })();
 </script>
 {% endblock %}

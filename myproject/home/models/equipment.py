@@ -1,6 +1,4 @@
 from django.contrib.gis.db import models
-from .room import Room
-
 
 class Equipment(models.Model):
     STATUS = [
@@ -10,13 +8,20 @@ class Equipment(models.Model):
     ]
 
     code = models.CharField(max_length=50, unique=True)
-    name = models.TextField()
-    equipment_type = models.TextField()
-    status = models.CharField(max_length=20, choices=STATUS)
+    name = models.TextField(null=True, blank=True)
+    equipment_type = models.TextField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS, null=True, blank=True)
     install_date = models.DateField(null=True, blank=True)
     last_maintenance = models.DateField(null=True, blank=True)
-    room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True)
-    geom = models.PointField(srid=4326)
+    
+    # Đã chuyển thành CASCADE theo CSDL mới
+    room = models.ForeignKey('Room', on_delete=models.CASCADE)
+    
+    # Các trường mới cho chức năng bản đồ trong nhà (Indoor Mapping)
+    local_x = models.IntegerField(null=True, blank=True)
+    local_y = models.IntegerField(null=True, blank=True)
+    
+    geom = models.PointField(srid=4326, null=True, blank=True)
 
     def __str__(self):
-        return self.code
+        return self.name if self.name else self.code
