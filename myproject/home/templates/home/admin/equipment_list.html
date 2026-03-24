@@ -32,6 +32,11 @@
       <div class="col-md-2 d-grid">
         <button class="btn btn-admin-primary" type="submit">Lọc</button>
       </div>
+      {% if q or status_filter %}
+      <div class="col-md-12">
+        <a class="btn btn-link p-0 text-decoration-none" href="{% url 'admin_equipment_list' %}">↺ Quay lại danh sách ban đầu</a>
+      </div>
+      {% endif %}
     </form>
     <form method="post">
       {% csrf_token %}

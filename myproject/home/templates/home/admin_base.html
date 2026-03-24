@@ -104,10 +104,11 @@
                href="{% url 'admin_dashboard' %}">Trang tổng quan</a>
           </li>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if 'admin_building' in request.resolver_match.url_name or 'admin_room' in request.resolver_match.url_name or 'admin_tree' in request.resolver_match.url_name or 'admin_equipment' in request.resolver_match.url_name or 'admin_incident' in request.resolver_match.url_name %}active{% endif %}"
+            <a class="nav-link dropdown-toggle {% if 'admin_building' in request.resolver_match.url_name or 'admin_floor' in request.resolver_match.url_name or 'admin_room' in request.resolver_match.url_name or 'admin_tree' in request.resolver_match.url_name or 'admin_equipment' in request.resolver_match.url_name or 'admin_incident' in request.resolver_match.url_name %}active{% endif %}"
                href="#" id="dataDropdown" role="button" data-bs-toggle="dropdown">Dữ liệu hạ tầng</a>
             <ul class="dropdown-menu">
               <li><a class="dropdown-item" href="{% url 'admin_building_list' %}">Tòa nhà</a></li>
+              <li><a class="dropdown-item" href="{% url 'admin_floor_list' %}">Tầng</a></li>
               <li><a class="dropdown-item" href="{% url 'admin_room_list' %}">Phòng</a></li>
               <li><a class="dropdown-item" href="{% url 'admin_tree_list' %}">Cây xanh</a></li>
               <li><a class="dropdown-item" href="{% url 'admin_equipment_list' %}">Thiết bị</a></li>
@@ -149,6 +150,7 @@
         <div class="list-group">
           <a class="list-group-item {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}" href="{% url 'admin_dashboard' %}">Trang tổng quan</a>
           <a class="list-group-item {% if 'admin_building' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_building_list' %}">Tòa nhà</a>
+          <a class="list-group-item {% if 'admin_floor' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_floor_list' %}">Tầng</a>
           <a class="list-group-item {% if 'admin_room' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_room_list' %}">Phòng</a>
           <a class="list-group-item {% if 'admin_tree' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_tree_list' %}">Cây xanh</a>
           <a class="list-group-item {% if 'admin_equipment' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_equipment_list' %}">Thiết bị</a>

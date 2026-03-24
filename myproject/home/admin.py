@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.gis.admin import GISModelAdmin
 from .models import (
-    Role, AppUser, Building, Room, Tree, Equipment,
+    Role, AppUser, Building, Floor, Room, Tree, Equipment,
     Asset, IncidentType, Incident, Maintenance
 )
 
@@ -52,6 +52,13 @@ class MaintenanceAdmin(admin.ModelAdmin):
     list_display = ('maintenance_type', 'maintenance_date', 'asset', 'cost')
     list_filter = ('maintenance_type', 'maintenance_date')
 
+# BỔ SUNG: Bảng Floor (Không có cột geom nên dùng ModelAdmin thường)
+@admin.register(Floor)
+class FloorAdmin(admin.ModelAdmin):
+    list_display = ('name', 'level', 'building')
+    list_filter = ('building',)
+    search_fields = ('name',)
+
 # 2. Các Model CÓ bản đồ (Dùng GISModelAdmin)
 # GISModelAdmin sẽ tự động hiển thị bản đồ OpenStreetMap để bạn chấm điểm/vẽ hình
 
@@ -62,8 +69,9 @@ class BuildingAdmin(GISModelAdmin):
 
 @admin.register(Room)
 class RoomAdmin(GISModelAdmin):
-    list_display = ('name', 'room_type', 'building', 'capacity')
-    list_filter = ('room_type', 'building')
+    # CẬP NHẬT: Đổi 'building' thành 'floor'
+    list_display = ('name', 'room_type', 'floor', 'capacity')
+    list_filter = ('room_type', 'floor')
     search_fields = ('name',)
 
 @admin.register(Tree)

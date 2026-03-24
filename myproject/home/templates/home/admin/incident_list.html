@@ -31,6 +31,11 @@
       <div class="col-md-2 d-grid">
         <button class="btn btn-admin-primary" type="submit">Lọc</button>
       </div>
+      {% if q or status_filter %}
+      <div class="col-md-12">
+        <a class="btn btn-link p-0 text-decoration-none" href="{% url 'admin_incident_list' %}">↺ Quay lại danh sách ban đầu</a>
+      </div>
+      {% endif %}
     </form>
     <form method="post">
       {% csrf_token %}
@@ -57,15 +62,15 @@
         </thead>
         <tbody>
           {% for i in incidents %}
-          <tr>
-            <td><input type="checkbox" name="_selected_action" value="{{ i.pk }}"></td>
-            <td>{{ i.title|truncatewords:6 }}</td>
+          <tr style="cursor:pointer;" data-href="{% url 'admin_incident_edit' i.pk %}">
+            <td onclick="event.stopPropagation();"><input type="checkbox" name="_selected_action" value="{{ i.pk }}"></td>
+            <td><a class="text-decoration-none fw-semibold text-success" href="{% url 'admin_incident_edit' i.pk %}">{{ i.title|truncatewords:6 }}</a></td>
             <td>{{ i.asset }}</td>
             <td>{{ i.incident_type|default:"-" }}</td>
             <td>{{ i.get_priority_display }}</td>
             <td>{{ i.get_status_display }}</td>
             <td>{{ i.reported_at|date:"d/m/Y H:i" }}</td>
-            <td class="text-end">
+            <td class="text-end" onclick="event.stopPropagation();">
               <a href="{% url 'admin_incident_edit' i.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
               <a href="{% url 'admin_incident_delete' i.pk %}" class="btn btn-outline-danger btn-sm">Xóa</a>
             </td>

@@ -1,6 +1,5 @@
 from django.contrib.gis.db import models
 
-
 class Building(models.Model):
     name = models.TextField()
     description = models.TextField(null=True, blank=True)

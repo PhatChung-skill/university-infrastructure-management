@@ -27,6 +27,38 @@ from .models import (
     Room,
 )
 import json
+import unicodedata
+from typing import Optional
+
+
+def _normalize_role_name(name: Optional[str]) -> str:
+    if not name:
+        return ""
+    normalized = unicodedata.normalize("NFD", name).encode("ascii", "ignore").decode("ascii")
+    return normalized.strip().lower()
+
+
+def _current_role_name(request):
+    app_user = AppUser.objects.select_related("role").filter(username=request.user.username).first()
+    return app_user, _normalize_role_name(app_user.role.name if app_user and app_user.role else "")
+
+
+def _is_admin_role(role_name: str) -> bool:
+    return role_name in {"admin", "quan tri", "quan tri vien", "administrator"}
+
+
+def _is_facility_role(role_name: str) -> bool:
+    return role_name in {
+        "facility_staff",
+        "nhan vien csvc",
+        "nhan vien co so vat chat",
+        "csvc",
+        "co so vat chat",
+    }
+
+
+def _is_teacher_role(role_name: str) -> bool:
+    return role_name in {"teacher", "giang vien", "giao vien"}
 
 
 class Login(LoginView):
@@ -43,22 +75,21 @@ class Login(LoginView):
         - Ngược lại => chuyển sang trang bản đồ (map)
         """
         user = self.request.user
-        app_user = AppUser.objects.select_related("role").filter(username=user.username).first()
+        _, role_name = _current_role_name(self.request)
 
         # 1. Ưu tiên tài khoản admin của Django (superuser / staff) → custom admin
         if user.is_superuser or user.is_staff:
             return reverse("admin_dashboard")
 
         # 2. Hoặc người dùng có role trong bảng AppUser/Role
-        if app_user and app_user.role:
-            role_name = app_user.role.name.lower()
-            if role_name == "admin":
+        if role_name:
+            if _is_admin_role(role_name):
                 return reverse("admin_dashboard")
             # Nhân viên CSVC: chấp nhận cả tên role tiếng Anh và tiếng Việt
-            if role_name in ("facility_staff", "nhân viên csvc"):
+            if _is_facility_role(role_name):
                 return reverse("facility_dashboard")
             # Giáo viên: chấp nhận cả 'teacher' và 'giảng viên'
-            if role_name in ("teacher", "giảng viên"):
+            if _is_teacher_role(role_name):
                 return reverse("teacher_dashboard")
 
         return reverse("map_view")
@@ -90,9 +121,17 @@ def map_view(request):
             if asset.asset_type == "equipment" and asset.equipment:
                 e = asset.equipment
                 asset_search = [e.name or "", e.code or "", e.equipment_type or ""]
+                blueprint_url = ""
+                if getattr(e, "room", None) and getattr(e.room, "blueprint_url", None):
+                    blueprint_url = e.room.blueprint_url
             elif asset.asset_type == "tree" and asset.tree:
                 t = asset.tree
                 asset_search = [t.species or "", t.code or ""]
+                blueprint_url = ""
+            else:
+                blueprint_url = ""
+        else:
+            blueprint_url = ""
         asset_search_text = " ".join(s.strip() for s in asset_search if s).strip()
         props = {
             "title": inc.title,
@@ -104,6 +143,7 @@ def map_view(request):
             "incident_type_code": inc.incident_type.code if inc.incident_type else "",
             "asset_type": asset.asset_type if asset else "",
             "asset_search_text": asset_search_text,
+            "image_url": blueprint_url,
         }
         incidents_features.append(
             {
@@ -116,35 +156,70 @@ def map_view(request):
         {"type": "FeatureCollection", "features": incidents_features}
     )
 
-    rooms_geojson = serialize('geojson', Room.objects.exclude(geom__isnull=True),
-                              geometry_field='geom',
-                              fields=('name', 'room_type'))
+    # Rooms: tự build GeoJSON để bổ sung thông tin tầng/tòa nhà + ảnh blueprint
+    room_features = []
+    for room in Room.objects.select_related("floor", "floor__building").exclude(geom__isnull=True):
+        room_features.append(
+            {
+                "type": "Feature",
+                "geometry": json.loads(room.geom.geojson),
+                "properties": {
+                    "id": room.id,
+                    "name": room.name,
+                    "room_type": room.room_type,
+                    "capacity": room.capacity,
+                    "floor_name": room.floor.name if room.floor else "",
+                    "building_name": room.floor.building.name if room.floor and room.floor.building else "",
+                    "blueprint_url": room.blueprint_url or "",
+                    "blueprint_width": room.blueprint_width,
+                    "blueprint_height": room.blueprint_height,
+                },
+            }
+        )
+    rooms_geojson = json.dumps({"type": "FeatureCollection", "features": room_features})
 
-    equipment_geojson = serialize('geojson', Equipment.objects.exclude(geom__isnull=True),
-                                  geometry_field='geom',
-                                  fields=('code', 'name', 'status'))
+    # Equipment: bổ sung phòng/tầng/tòa nhà + ảnh blueprint của phòng
+    equipment_features = []
+    for eq in (
+        Equipment.objects.exclude(geom__isnull=True)
+        .select_related("room", "room__floor", "room__floor__building")
+    ):
+        equipment_features.append(
+            {
+                "type": "Feature",
+                "geometry": json.loads(eq.geom.geojson),
+                "properties": {
+                    "id": eq.id,
+                    "code": eq.code,
+                    "name": eq.name,
+                    "status": eq.status,
+                    "equipment_type": eq.equipment_type,
+                    "room_name": eq.room.name if eq.room else "",
+                    "floor_name": eq.room.floor.name if eq.room and eq.room.floor else "",
+                    "building_name": eq.room.floor.building.name if eq.room and eq.room.floor and eq.room.floor.building else "",
+                    "blueprint_url": (eq.room.blueprint_url if eq.room else "") or "",
+                },
+            }
+        )
+    equipment_geojson = json.dumps({"type": "FeatureCollection", "features": equipment_features})
 
     # 2. Xác định nút quay lại phù hợp (Admin hoặc Nhân viên CSVC)
     back_url = None
     back_label = None
 
     if request.user.is_authenticated:
-        app_user = AppUser.objects.select_related("role").filter(
-            username=request.user.username
-        ).first()
-
-        role_name = app_user.role.name.lower() if app_user and app_user.role else None
+        _, role_name = _current_role_name(request)
 
         # Admin (custom admin dashboard)
-        if request.user.is_superuser or request.user.is_staff or role_name == "admin":
+        if request.user.is_superuser or request.user.is_staff or _is_admin_role(role_name):
             back_url = reverse("admin_dashboard")
             back_label = "← Quay lại trang quản trị"
         # Nhân viên CSVC (cả tiếng Anh & tiếng Việt)
-        elif role_name in ("facility_staff", "nhân viên csvc"):
+        elif _is_facility_role(role_name):
             back_url = reverse("facility_dashboard")
             back_label = "← Quay lại dashboard CSVC"
         # Giáo viên
-        elif role_name in ("teacher", "giảng viên"):
+        elif _is_teacher_role(role_name):
             back_url = reverse("teacher_dashboard")
             back_label = "← Quay lại dashboard GV"
 
@@ -203,6 +278,17 @@ def radius_search(request):
                     "code": obj.code,
                     "name": obj.name,
                     "status": obj.status,
+                    "equipment_type": obj.equipment_type,
+                    "room_name": obj.room.name if getattr(obj, "room", None) else "",
+                    "floor_name": obj.room.floor.name if getattr(obj, "room", None) and getattr(obj.room, "floor", None) else "",
+                    "building_name": (
+                        obj.room.floor.building.name
+                        if getattr(obj, "room", None)
+                        and getattr(obj.room, "floor", None)
+                        and getattr(obj.room.floor, "building", None)
+                        else ""
+                    ),
+                    "blueprint_url": (obj.room.blueprint_url if getattr(obj, "room", None) else "") or "",
                 }
             elif isinstance(obj, Room):
                 props = {
@@ -210,6 +296,16 @@ def radius_search(request):
                     "type": "room",
                     "name": obj.name,
                     "room_type": obj.room_type,
+                    "capacity": obj.capacity,
+                    "floor_name": obj.floor.name if getattr(obj, "floor", None) else "",
+                    "building_name": (
+                        obj.floor.building.name
+                        if getattr(obj, "floor", None) and getattr(obj.floor, "building", None)
+                        else ""
+                    ),
+                    "blueprint_url": obj.blueprint_url or "",
+                    "blueprint_width": obj.blueprint_width,
+                    "blueprint_height": obj.blueprint_height,
                 }
             if extra_props:
                 props.update(extra_props(obj))
@@ -227,12 +323,17 @@ def radius_search(request):
         result["trees"] = to_feature_collection(trees_qs)
 
     if "devices" in layer_names or "equipment" in layer_names:
-        equip_qs = Equipment.objects.filter(geom__distance_lte=(point, D(m=radius)))
+        equip_qs = (
+            Equipment.objects.filter(geom__distance_lte=(point, D(m=radius)))
+            .select_related("room", "room__floor", "room__floor__building")
+        )
         result["equipment"] = to_feature_collection(equip_qs)
 
     if "rooms" in layer_names:
-        rooms_qs = Room.objects.exclude(geom__isnull=True).filter(
-            geom__distance_lte=(point, D(m=radius))
+        rooms_qs = (
+            Room.objects.exclude(geom__isnull=True)
+            .filter(geom__distance_lte=(point, D(m=radius)))
+            .select_related("floor", "floor__building")
         )
         result["rooms"] = to_feature_collection(rooms_qs)
 
@@ -296,6 +397,7 @@ def devices_to_check(request):
             "name": device.name,
             "status": device.status,
             "room_name": room.name if room else "",
+            "blueprint_url": room.blueprint_url if room else "",
         }
         features.append(
             {
@@ -326,14 +428,10 @@ def facility_dashboard(request):
     Dashboard dành cho Nhân viên CSVC (role = 'facility_staff').
     Cho phép tạo phiếu bảo trì tài sản (thiết bị / cây) nhưng KHÔNG cho quản lý user & phân quyền.
     """
-    app_user = AppUser.objects.select_related("role").filter(username=request.user.username).first()
+    app_user, role_name = _current_role_name(request)
 
     # Chỉ cho phép role Nhân viên CSVC (tiếng Anh hoặc tiếng Việt)
-    if not (
-        app_user
-        and app_user.role
-        and app_user.role.name.lower() in ("facility_staff", "nhân viên csvc")
-    ):
+    if not (app_user and _is_facility_role(role_name)):
         return redirect("map_view")
 
     if request.method == "POST":
@@ -365,13 +463,9 @@ def facility_incident(request):
     """
     Trang Báo cáo sự cố dành cho Nhân viên CSVC.
     """
-    app_user = AppUser.objects.select_related("role").filter(username=request.user.username).first()
+    app_user, role_name = _current_role_name(request)
 
-    if not (
-        app_user
-        and app_user.role
-        and app_user.role.name.lower() in ("facility_staff", "nhân viên csvc")
-    ):
+    if not (app_user and _is_facility_role(role_name)):
         return redirect("map_view")
 
     if request.method == "POST":
@@ -421,21 +515,13 @@ def teacher_dashboard(request):
     - Xem danh sách phòng học và trạng thái (tốt / hỏng / đang sửa) dựa trên thiết bị trong phòng
     - Chuyển sang bản đồ để xem vị trí
     """
-    app_user = AppUser.objects.select_related("role").filter(username=request.user.username).first()
+    app_user, role_name = _current_role_name(request)
 
-    if not (
-        app_user
-        and app_user.role
-        and app_user.role.name.lower() in ("teacher", "giảng viên")
-    ):
+    if not (app_user and _is_teacher_role(role_name)):
         return redirect("map_view")
 
     # Lấy danh sách phòng + thiết bị để tính trạng thái
-    rooms = (
-        Room.objects.select_related("building")
-        .prefetch_related("equipment_set")
-        .all()
-    )
+    rooms = Room.objects.select_related("floor", "floor__building").prefetch_related("equipment_set").all()
 
     room_status_list = []
     for room in rooms:

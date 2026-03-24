@@ -6,11 +6,14 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.db.models import Q
 from django.utils.decorators import method_decorator
 from django.contrib import messages
+from django.shortcuts import redirect
+from django.core.serializers import serialize
 
 from .decorators import admin_required
 from .admin_mixins import AdminSaveRedirectMixin, AdminBulkDeleteMixin
 from .models import (
     Building,
+    Floor,          # BỔ SUNG: Import Floor
     Room,
     Tree,
     Equipment,
@@ -26,6 +29,7 @@ from .admin_forms import (
     EquipmentAdminForm,
     RoomAdminForm,
     BuildingAdminForm,
+    FloorAdminForm, # BỔ SUNG: Import FloorAdminForm
     IncidentAdminForm,
     IncidentTypeAdminForm,
     AssetAdminForm,
@@ -109,6 +113,34 @@ class TreeCreateView(AdminSaveRedirectMixin, CreateView):
         messages.success(self.request, "Đã thêm cây xanh mới.")
         return super().form_valid(form)
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["buildings_json"] = serialize(
+            "geojson",
+            Building.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "description"),
+        )
+        ctx["rooms_json"] = serialize(
+            "geojson",
+            Room.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "room_type"),
+        )
+        ctx["trees_json"] = serialize(
+            "geojson",
+            Tree.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "species", "health_status"),
+        )
+        ctx["equipment_json"] = serialize(
+            "geojson",
+            Equipment.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "name", "status"),
+        )
+        return ctx
+
 
 @method_decorator(admin_required, name="dispatch")
 class TreeUpdateView(AdminSaveRedirectMixin, UpdateView):
@@ -122,6 +154,34 @@ class TreeUpdateView(AdminSaveRedirectMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Đã cập nhật thông tin cây.")
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["buildings_json"] = serialize(
+            "geojson",
+            Building.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "description"),
+        )
+        ctx["rooms_json"] = serialize(
+            "geojson",
+            Room.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "room_type"),
+        )
+        ctx["trees_json"] = serialize(
+            "geojson",
+            Tree.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "species", "health_status"),
+        )
+        ctx["equipment_json"] = serialize(
+            "geojson",
+            Equipment.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "name", "status"),
+        )
+        return ctx
 
 
 @method_decorator(admin_required, name="dispatch")
@@ -186,6 +246,34 @@ class EquipmentCreateView(AdminSaveRedirectMixin, CreateView):
         messages.success(self.request, "Đã thêm thiết bị mới.")
         return super().form_valid(form)
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["buildings_json"] = serialize(
+            "geojson",
+            Building.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "description"),
+        )
+        ctx["rooms_json"] = serialize(
+            "geojson",
+            Room.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "room_type"),
+        )
+        ctx["trees_json"] = serialize(
+            "geojson",
+            Tree.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "species", "health_status"),
+        )
+        ctx["equipment_json"] = serialize(
+            "geojson",
+            Equipment.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "name", "status"),
+        )
+        return ctx
+
 
 @method_decorator(admin_required, name="dispatch")
 class EquipmentUpdateView(AdminSaveRedirectMixin, UpdateView):
@@ -199,6 +287,34 @@ class EquipmentUpdateView(AdminSaveRedirectMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Đã cập nhật thiết bị.")
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["buildings_json"] = serialize(
+            "geojson",
+            Building.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "description"),
+        )
+        ctx["rooms_json"] = serialize(
+            "geojson",
+            Room.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "room_type"),
+        )
+        ctx["trees_json"] = serialize(
+            "geojson",
+            Tree.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "species", "health_status"),
+        )
+        ctx["equipment_json"] = serialize(
+            "geojson",
+            Equipment.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "name", "status"),
+        )
+        return ctx
 
 
 @method_decorator(admin_required, name="dispatch")
@@ -219,7 +335,76 @@ class EquipmentDeleteView(DeleteView):
         return super().delete(request, *args, **kwargs)
 
 
-# ----- Room -----
+# THÊM MỚI: ----- Floor -----
+# ==========================================
+@method_decorator(admin_required, name="dispatch")
+class FloorListView(AdminBulkDeleteMixin, ListView):
+    model = Floor
+    template_name = "home/admin/floor_list.html"
+    context_object_name = "floors"
+    paginate_by = 20
+    bulk_delete_message = "Đã xóa tầng đã chọn."
+
+    def get_queryset(self):
+        # Lấy kèm thông tin tòa nhà để hiển thị nhanh hơn
+        qs = Floor.objects.select_related("building").order_by("building__name", "level")
+        q = (self.request.GET.get("q") or "").strip()
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(building__name__icontains=q))
+        return qs
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["q"] = self.request.GET.get("q", "")
+        return ctx
+
+@method_decorator(admin_required, name="dispatch")
+class FloorCreateView(AdminSaveRedirectMixin, CreateView):
+    model = Floor
+    form_class = FloorAdminForm
+    template_name = "home/admin/floor_form.html"
+    list_url_name = "admin_floor_list"
+    add_url_name = "admin_floor_add"
+    edit_url_name = "admin_floor_edit"
+
+    def form_valid(self, form):
+        messages.success(self.request, "Đã thêm tầng mới.")
+        return super().form_valid(form)
+
+@method_decorator(admin_required, name="dispatch")
+class FloorUpdateView(AdminSaveRedirectMixin, UpdateView):
+    model = Floor
+    form_class = FloorAdminForm
+    template_name = "home/admin/floor_form.html"
+    list_url_name = "admin_floor_list"
+    add_url_name = "admin_floor_add"
+    edit_url_name = "admin_floor_edit"
+
+    def form_valid(self, form):
+        messages.success(self.request, "Đã cập nhật thông tin tầng.")
+        return super().form_valid(form)
+
+@method_decorator(admin_required, name="dispatch")
+class FloorDeleteView(DeleteView):
+    model = Floor
+    template_name = "home/admin/confirm_delete.html"
+    success_url = reverse_lazy("admin_floor_list")
+    context_object_name = "obj"
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["model_label"] = "Tầng"
+        ctx["list_url"] = "admin_floor_list"
+        return ctx
+
+    def delete(self, request, *args, **kwargs):
+        messages.success(request, "Đã xóa tầng.")
+        return super().delete(request, *args, **kwargs)
+
+
+# ==========================================
+# CẬP NHẬT: ----- Room -----
+# ==========================================
 @method_decorator(admin_required, name="dispatch")
 class RoomListView(AdminBulkDeleteMixin, ListView):
     model = Room
@@ -229,10 +414,12 @@ class RoomListView(AdminBulkDeleteMixin, ListView):
     bulk_delete_message = "Đã xóa phòng đã chọn."
 
     def get_queryset(self):
-        qs = Room.objects.select_related("building").order_by("name")
+        # CẬP NHẬT: Dùng floor__building thay vì building
+        qs = Room.objects.select_related("floor__building").order_by("name")
         q = (self.request.GET.get("q") or "").strip()
         if q:
-            filters = Q(name__icontains=q) | Q(building__name__icontains=q)
+            # Tìm theo tên phòng, tên tầng, tên tòa nhà
+            filters = Q(name__icontains=q) | Q(floor__name__icontains=q) | Q(floor__building__name__icontains=q)
 
             # Tìm theo loại phòng bằng tiếng Việt (label choices)
             q_lower = q.lower()
@@ -274,6 +461,20 @@ class RoomCreateView(AdminSaveRedirectMixin, CreateView):
         messages.success(self.request, "Đã thêm phòng mới.")
         return super().form_valid(form)
 
+    def form_invalid(self, form):
+        messages.error(self.request, "Không thể thêm phòng. Vui lòng kiểm tra lại dữ liệu (đặc biệt là hình dạng phòng Polygon/WKT).")
+        return super().form_invalid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["buildings_json"] = serialize(
+            "geojson",
+            Building.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "description"),
+        )
+        return ctx
+
 
 @method_decorator(admin_required, name="dispatch")
 class RoomUpdateView(AdminSaveRedirectMixin, UpdateView):
@@ -287,6 +488,20 @@ class RoomUpdateView(AdminSaveRedirectMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Đã cập nhật phòng.")
         return super().form_valid(form)
+
+    def form_invalid(self, form):
+        messages.error(self.request, "Không thể cập nhật phòng. Vui lòng kiểm tra lại dữ liệu (đặc biệt là hình dạng phòng Polygon/WKT).")
+        return super().form_invalid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["buildings_json"] = serialize(
+            "geojson",
+            Building.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "description"),
+        )
+        return ctx
 
 
 @method_decorator(admin_required, name="dispatch")
@@ -426,6 +641,34 @@ class IncidentCreateView(AdminSaveRedirectMixin, CreateView):
         messages.success(self.request, "Đã thêm sự cố mới.")
         return super().form_valid(form)
 
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["buildings_json"] = serialize(
+            "geojson",
+            Building.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "description"),
+        )
+        ctx["rooms_json"] = serialize(
+            "geojson",
+            Room.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "room_type"),
+        )
+        ctx["trees_json"] = serialize(
+            "geojson",
+            Tree.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "species", "health_status"),
+        )
+        ctx["equipment_json"] = serialize(
+            "geojson",
+            Equipment.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "name", "status"),
+        )
+        return ctx
+
 
 @method_decorator(admin_required, name="dispatch")
 class IncidentUpdateView(AdminSaveRedirectMixin, UpdateView):
@@ -439,6 +682,34 @@ class IncidentUpdateView(AdminSaveRedirectMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "Đã cập nhật sự cố.")
         return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["buildings_json"] = serialize(
+            "geojson",
+            Building.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "description"),
+        )
+        ctx["rooms_json"] = serialize(
+            "geojson",
+            Room.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("name", "room_type"),
+        )
+        ctx["trees_json"] = serialize(
+            "geojson",
+            Tree.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "species", "health_status"),
+        )
+        ctx["equipment_json"] = serialize(
+            "geojson",
+            Equipment.objects.exclude(geom__isnull=True),
+            geometry_field="geom",
+            fields=("code", "name", "status"),
+        )
+        return ctx
 
 
 @method_decorator(admin_required, name="dispatch")
@@ -638,12 +909,11 @@ class MaintenanceDeleteView(DeleteView):
 
 # ----- Role -----
 @method_decorator(admin_required, name="dispatch")
-class RoleListView(AdminBulkDeleteMixin, ListView):
+class RoleListView(ListView):
     model = Role
     template_name = "home/admin/role_list.html"
     context_object_name = "roles"
     paginate_by = 50
-    bulk_delete_message = "Đã xóa vai trò đã chọn."
 
     def get_queryset(self):
         return Role.objects.all().order_by("name")
@@ -657,6 +927,10 @@ class RoleCreateView(AdminSaveRedirectMixin, CreateView):
     list_url_name = "admin_role_list"
     add_url_name = "admin_role_add"
     edit_url_name = "admin_role_edit"
+
+    def dispatch(self, request, *args, **kwargs):
+        messages.info(request, "Vai trò đang ở chế độ chỉ xem. Bạn không thể thêm mới.")
+        return redirect("admin_role_list")
 
     def form_valid(self, form):
         messages.success(self.request, "Đã thêm vai trò mới.")
@@ -672,6 +946,10 @@ class RoleUpdateView(AdminSaveRedirectMixin, UpdateView):
     add_url_name = "admin_role_add"
     edit_url_name = "admin_role_edit"
 
+    def dispatch(self, request, *args, **kwargs):
+        messages.info(request, "Vai trò đang ở chế độ chỉ xem. Bạn không thể chỉnh sửa.")
+        return redirect("admin_role_list")
+
     def form_valid(self, form):
         messages.success(self.request, "Đã cập nhật vai trò.")
         return super().form_valid(form)
@@ -683,6 +961,10 @@ class RoleDeleteView(DeleteView):
     template_name = "home/admin/confirm_delete.html"
     success_url = reverse_lazy("admin_role_list")
     context_object_name = "obj"
+
+    def dispatch(self, request, *args, **kwargs):
+        messages.info(request, "Vai trò đang ở chế độ chỉ xem. Bạn không thể xóa.")
+        return redirect("admin_role_list")
 
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
