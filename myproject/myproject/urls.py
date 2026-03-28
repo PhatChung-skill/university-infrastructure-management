@@ -16,13 +16,19 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.conf import settings
+from django.conf.urls.static import static
 from home import views as core_views
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    # Custom admin (admin-dashboard, admin/users/, admin/buildings/, ...) must come first
     path('', include('home.urls')),
-    path('map/', core_views.map_view, name='map_view'),  # Đường dẫn vào bản đồ
-    # Đăng xuất: dùng view custom, luôn quay về /login/
+    path('map/', core_views.map_view, name='map_view'),
     path('logout/', core_views.logout_view, name='logout'),
+    # Django built-in admin at /django-admin/ (optional; you can remove if not needed)
+    path('django-admin/', admin.site.urls),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

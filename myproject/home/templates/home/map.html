@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
     <title>Bản đồ ĐH Tài nguyên và Môi trường TP.HCM</title>
     <meta charset="utf-8" />
@@ -8,14 +8,307 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     
     <style>
-        body { margin: 0; padding: 0; }
+        :root { --topbar-h: 56px; }
+        body { margin: 0; padding: 0; font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
         #map { width: 100%; height: 100vh; } /* Bản đồ full màn hình */
         
-        /* Style cho Legend (Chú thích) */
+        /* Style cho popup Leaflet */
         .leaflet-popup-content-wrapper { border-radius: 5px; }
+
+        /* Back bar */
+        .map-topbar{
+            position: fixed;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: var(--topbar-h);
+            z-index: 1100;
+            background: linear-gradient(135deg, #2e7d32, #43a047);
+            color: #e8f5e9;
+            box-shadow: 0 6px 18px rgba(0,0,0,.15);
+            display: flex;
+            align-items: center;
+        }
+        .map-topbar .inner{
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 0 14px;
+        }
+        .map-topbar a.back{
+            color: #e8f5e9;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 8px 10px;
+            border-radius: 10px;
+            background: rgba(255,255,255,.12);
+        }
+        .map-topbar a.back:hover{ background: rgba(255,255,255,.18); }
+        .map-topbar .title{
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        /* Không che mất control của leaflet ở góc trái trên */
+        .leaflet-top.leaflet-left{ top: calc(var(--topbar-h) + 10px); }
+
+        /* Legend (chú thích) */
+        .map-legend {
+            position: fixed;
+            right: 12px;
+            bottom: 12px;
+            z-index: 1100;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+            border-radius: 10px;
+            padding: 10px 14px;
+            font-size: 13px;
+            max-width: 260px;
+        }
+        .map-legend h4 {
+            margin: 0 0 6px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+        .map-legend .legend-group {
+            margin-bottom: 4px;
+        }
+        .map-legend .legend-title {
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        .map-legend .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 1px 0;
+        }
+        .map-legend .color-box {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            border: 1px solid #ccc;
+        }
+        .map-legend .legend-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            margin: 0;
+            padding: 4px 0 6px;
+            border: none;
+            background: none;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            color: inherit;
+        }
+        .map-legend .legend-toggle:hover {
+            opacity: 0.85;
+        }
+        .map-legend .legend-toggle .icon {
+            font-size: 12px;
+            transition: transform 0.2s;
+        }
+        .map-legend.collapsed .legend-toggle .icon {
+            transform: rotate(-90deg);
+        }
+        .map-legend .legend-body {
+            max-height: 420px;
+            overflow: hidden;
+            transition: max-height 0.2s ease-out;
+        }
+        .map-legend.collapsed .legend-body {
+            max-height: 0 !important;
+            padding-top: 0;
+            padding-bottom: 0;
+            margin: 0;
+        }
+
+        /* Toolbar bên trái cho các tool truy vấn (nằm dưới nút zoom +/-) */
+        .map-toolbar {
+            position: fixed;
+            left: 10px;
+            top: calc(var(--topbar-h) + 10px + 75px);
+            z-index: 1100;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .map-toolbar button {
+            border: none;
+            padding: 8px 10px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+            cursor: pointer;
+            font-size: 13px;
+            text-align: left;
+            min-width: 160px;
+        }
+        .map-toolbar button:hover {
+            background: #e8f5e9;
+        }
+
+        /* Panel kết quả truy vấn nâng cao bên phải */
+        .query-panel {
+            position: fixed;
+            right: 12px;
+            top: calc(var(--topbar-h) + 16px);
+            z-index: 1100;
+            background: rgba(255, 255, 255, 0.97);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+            border-radius: 10px;
+            padding: 10px 12px;
+            width: 280px;
+            max-height: calc(100vh - var(--topbar-h) - 40px);
+            overflow: auto;
+            font-size: 13px;
+        }
+        .query-panel h4 {
+            margin: 0 0 6px;
+            font-size: 13px;
+        }
+        .query-panel .query-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 6px;
+        }
+        .query-panel .query-buttons button {
+            border: none;
+            padding: 6px 8px;
+            border-radius: 6px;
+            background: #f5f5f5;
+            cursor: pointer;
+            text-align: left;
+        }
+        .query-panel .query-buttons button:hover {
+            background: #e3f2fd;
+        }
+        .query-panel .query-results {
+            border-top: 1px solid #eee;
+            padding-top: 4px;
+            margin-top: 4px;
+        }
+        .query-panel .result-item {
+            padding: 3px 0;
+            border-bottom: 1px dashed #eee;
+        }
+        .query-panel .incident-search {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid #eee;
+        }
+        .query-panel .incident-search input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 4px 6px;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+        .query-panel .incident-search button {
+            width: 100%;
+        }
     </style>
 </head>
 <body>
+
+    <div class="map-topbar">
+        <div class="inner">
+            <div>
+                {% if back_url %}
+                    <a class="back" href="{{ back_url }}">{{ back_label }}</a>
+                {% else %}
+                    <a class="back" href="{% url 'login' %}">← Quay lại đăng nhập</a>
+                {% endif %}
+            </div>
+            <div class="title">Bản đồ khuôn viên</div>
+            <div style="width: 1px;"></div>
+        </div>
+    </div>
+
+    <!-- Toolbar tool truy vấn -->
+    <div class="map-toolbar">
+        <button id="btn-radius-search">🔍 Truy vấn bán kính</button>
+        <button id="btn-show-all">⬅️ Quay lại bản đồ gốc</button>
+    </div>
+
+    <!-- Panel truy vấn nâng cao -->
+    <div class="query-panel">
+        <h4>Truy vấn nâng cao</h4>
+        <div class="query-buttons">
+            <button id="btn-dangerous-trees">🌳 Cây nguy hiểm</button>
+            <button id="btn-devices-check">⚙️ Thiết bị cần kiểm tra</button>
+        </div>
+        <div id="query-results" class="query-results"></div>
+        <div class="incident-search">
+            <div style="font-weight:600; margin-bottom:2px;">Tìm kiếm sự cố</div>
+            <input id="incident-search-input" type="text" placeholder="VD: cao, trung bình, thấp, mở, loa, me tây, pc đài loan..." />
+            <button id="btn-search-incidents">🚨 Tìm sự cố trên bản đồ</button>
+        </div>
+    </div>
+
+    <!-- Legend chú thích (có thể đóng/mở) -->
+    <div class="map-legend" id="map-legend">
+        <button type="button" class="legend-toggle" id="legend-toggle" aria-expanded="true">
+            <span>Chú thích bản đồ</span>
+            <span class="icon">▼</span>
+        </button>
+        <div class="legend-body" id="legend-body">
+        <div class="legend-group">
+            <div class="legend-title">Cây xanh</div>
+            <div class="legend-item">
+                <span class="color-box" style="background:#27ae60;"></span>
+                <span>Cây khỏe</span>
+            </div>
+            <div class="legend-item">
+                <span class="color-box" style="background:#f39c12;"></span>
+                <span>Cây bệnh</span>
+            </div>
+            <div class="legend-item">
+                <span class="color-box" style="background:#c0392b;"></span>
+                <span>Cây nguy hiểm</span>
+            </div>
+        </div>
+        <div class="legend-group">
+            <div class="legend-title">Thiết bị</div>
+            <div class="legend-item">
+                <span class="color-box" style="background:#1565c0;"></span>
+                <span>Trạng thái tốt</span>
+            </div>
+            <div class="legend-item">
+                <span class="color-box" style="background:#f9a825;"></span>
+                <span>Đang sửa</span>
+            </div>
+            <div class="legend-item">
+                <span class="color-box" style="background:#c62828;"></span>
+                <span>Hỏng</span>
+            </div>
+        </div>
+        <div class="legend-group">
+            <div class="legend-title">Khu vực / Phòng</div>
+            <div class="legend-item">
+                <span class="color-box" style="background:#3498db;"></span>
+                <span>Tòa nhà (polygon xanh dương)</span>
+            </div>
+            <div class="legend-item">
+                <span class="color-box" style="background:#9b59b6;"></span>
+                <span>Phòng (polygon tím)</span>
+            </div>
+        </div>
+        <div class="legend-group">
+            <div class="legend-title">Sự cố</div>
+            <div class="legend-item">
+                <span class="color-box" style="background:#e74c3c;"></span>
+                <span>Sự cố trên bản đồ</span>
+            </div>
+        </div>
+        </div>
+    </div>
 
     <div id="map"></div>
 
@@ -23,19 +316,66 @@
 
     <script>
         // --- A. Khởi tạo bản đồ ---
-        // Tọa độ HCMUNRE (Lê Văn Sỹ): [10.7984, 106.6655]
-        var map = L.map('map').setView([10.7984, 106.6655], 18);
+        // Giữ zoom đủ gần nhưng vẫn còn nền tile (OSM native zoom ~19)
+        var map = L.map('map', { maxZoom: 22 }).setView([10.7984, 106.6655], 19);
 
         // --- B. Thêm lớp nền (Base Map) ---
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '&copy; OpenStreetMap contributors'
+            attribution: '&copy; OpenStreetMap contributors',
+            maxNativeZoom: 19,
+            maxZoom: 22
         }).addTo(map);
+
+        // --- B0. Cho phép mở map theo tọa độ từ URL (từ trang admin) ---
+        var hasUrlFocus = false;
+        (function() {
+            var params = new URLSearchParams(window.location.search);
+            var lat = parseFloat(params.get('lat'));
+            var lng = parseFloat(params.get('lng'));
+            var zoom = parseInt(params.get('zoom') || '19', 10);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                map.setView([lat, lng], isNaN(zoom) ? 19 : Math.min(zoom, 22));
+                hasUrlFocus = true;
+            }
+        })();
 
         // --- C. Nhận dữ liệu từ Django View ---
         // Dữ liệu này được truyền từ views.py
         var buildingsData = {{ buildings_json|safe }};
         var treesData = {{ trees_json|safe }};
         var incidentsData = {{ incidents_json|safe }};
+        var roomsData = {{ rooms_json|safe }};
+        var equipmentData = {{ equipment_json|safe }};
+
+        // URL API cho các tool truy vấn
+        var radiusSearchUrl = "{% url 'radius_search' %}";
+        var dangerousTreesUrl = "{% url 'dangerous_trees' %}";
+        var devicesToCheckUrl = "{% url 'devices_to_check' %}";
+
+        // --- D0. Mapping hiển thị tiếng Việt ---
+        var VI_TREE_STATUS = {
+            "good": "Tốt",
+            "diseased": "Bệnh",
+            "dangerous": "Nguy hiểm"
+        };
+
+        var VI_INCIDENT_PRIORITY = {
+            "low": "Thấp",
+            "medium": "Trung bình",
+            "high": "Cao"
+        };
+
+        var VI_INCIDENT_STATUS = {
+            "open": "Mở",
+            "processing": "Đang xử lý",
+            "closed": "Đã đóng"
+        };
+
+        var VI_EQUIPMENT_STATUS = {
+            "good": "Tốt",
+            "maintenance": "Đang sửa",
+            "broken": "Hỏng"
+        };
 
         // --- D. Định nghĩa Style cho từng lớp ---
 
@@ -64,16 +404,86 @@
             });
         }
 
-        // 3. Style Sự cố (Hình tròn nhấp nháy đỏ)
+        // 3. Style Sự cố (Hình tròn đỏ)
         function incidentPoint(feature, latlng) {
             return L.circleMarker(latlng, {
                 radius: 10,
-                fillColor: "#e74c3c", 
+                fillColor: "#e74c3c",
                 color: "#c0392b",
                 weight: 2,
                 opacity: 1,
                 fillOpacity: 0.8
             });
+        }
+
+        // 4. Style Phòng (Polygon tím)
+        var roomStyle = {
+            "color": "#6a1b9a",
+            "weight": 2,
+            "opacity": 1,
+            "fillColor": "#9b59b6",
+            "fillOpacity": 0.35
+        };
+
+        // 5. Style Thiết bị (màu theo trạng thái: tốt = xanh biển đậm, đang sửa = vàng, hỏng = đỏ đậm)
+        var EQUIPMENT_COLORS = {
+            "good": { fill: "#1565c0", stroke: "#0d47a1" },
+            "maintenance": { fill: "#f9a825", stroke: "#f57f17" },
+            "broken": { fill: "#c62828", stroke: "#b71c1c" }
+        };
+        function equipmentPoint(feature, latlng) {
+            var status = (feature.properties && feature.properties.status) || "good";
+            var colors = EQUIPMENT_COLORS[status] || EQUIPMENT_COLORS["good"];
+            return L.circleMarker(latlng, {
+                radius: 6,
+                fillColor: colors.fill,
+                color: colors.stroke,
+                weight: 1,
+                fillOpacity: 1
+            });
+        }
+
+        function viRoomType(code) {
+            var mapType = {
+                "classroom": "Phòng học",
+                "lab": "Phòng thí nghiệm",
+                "library": "Thư viện",
+                "office": "Văn phòng",
+                "hall": "Hội trường"
+            };
+            return mapType[code] || code || "";
+        }
+
+        function makeImageHtml(url, altText) {
+            if (!url) return "";
+            return (
+                "<div style='margin-top:8px'>" +
+                "<img src='" + url + "' alt='" + (altText || "image") + "' " +
+                "style='width:100%;max-width:240px;max-height:140px;object-fit:cover;border-radius:8px;border:1px solid #d7e0d7;'/>" +
+                "</div>"
+            );
+        }
+
+        function renderSelectedDetails(title, html) {
+            var el = document.getElementById("query-results");
+            if (!el) return;
+            el.innerHTML = "<strong>" + title + "</strong><div style='margin-top:6px'>" + html + "</div>";
+        }
+
+        var radiusMode = false;
+
+        function handleFeatureClick(e, detailTitle, detailHtml) {
+            // Nếu đang bật chế độ truy vấn bán kính thì click vào đối tượng sẽ dùng luôn làm tâm truy vấn
+            if (radiusMode) {
+                if (e && e.originalEvent) {
+                    L.DomEvent.stopPropagation(e.originalEvent);
+                }
+                radiusMode = false;
+                map.getContainer().style.cursor = "";
+                runRadiusSearchAt(e.latlng);
+                return;
+            }
+            renderSelectedDetails(detailTitle, detailHtml);
         }
 
         // --- E. Thêm các lớp vào bản đồ ---
@@ -82,7 +492,11 @@
         var buildingsLayer = L.geoJSON(buildingsData, {
             style: buildingStyle,
             onEachFeature: function (feature, layer) {
-                layer.bindPopup("<b>🏢 " + feature.properties.name + "</b><br>" + feature.properties.description);
+                var html = "<b>🏢 " + (feature.properties.name || "") + "</b><br>" + (feature.properties.description || "");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết tòa nhà", html);
+                });
             }
         }).addTo(map);
 
@@ -93,7 +507,15 @@
                 var status = feature.properties.health_status;
                 var icon = "🌳";
                 if (status == 'dangerous') icon = "⚠️";
-                layer.bindPopup("<b>" + icon + " Cây: " + feature.properties.species + "</b><br>Mã: " + feature.properties.code + "<br>Tình trạng: " + status);
+                var viStatus = VI_TREE_STATUS[status] || status;
+                var html =
+                    "<b>" + icon + " Cây: " + feature.properties.species + "</b>"
+                    + "<br>Mã: " + feature.properties.code
+                    + "<br>Tình trạng: " + viStatus;
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết cây", html);
+                });
             }
         }).addTo(map);
 
@@ -102,18 +524,564 @@
             pointToLayer: incidentPoint,
             onEachFeature: function (feature, layer) {
                 var priority = feature.properties.priority;
-                var color = priority == 'high' ? 'red' : 'black';
-                layer.bindPopup("<b>🔥 SỰ CỐ: " + feature.properties.title + "</b><br>Mức độ: <span style='color:"+color+"'><b>" + priority.toUpperCase() + "</b></span><br>Trạng thái: " + feature.properties.status);
+                var status = feature.properties.status;
+                var viPriority = VI_INCIDENT_PRIORITY[priority] || priority;
+                var viStatus = VI_INCIDENT_STATUS[status] || status;
+                var color = priority == 'high' ? 'red' : (priority == 'medium' ? '#f39c12' : '#2e7d32');
+                var p = feature.properties || {};
+                var html =
+                    "<b>🔥 SỰ CỐ: " + feature.properties.title + "</b>"
+                    + "<br>Mức độ: <span style='color:" + color + "'><b>" + viPriority + "</b></span>"
+                    + "<br>Trạng thái: " + viStatus
+                    + "<br>Loại sự cố: " + (p.incident_type || "-")
+                    + makeImageHtml(p.image_url, "Hình ảnh liên quan sự cố");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết sự cố", html);
+                });
             }
         }).addTo(map);
+
+        // Lớp Phòng
+        var roomsLayer = L.geoJSON(roomsData, {
+            style: roomStyle,
+            onEachFeature: function (feature, layer) {
+                var p = feature.properties || {};
+                var html =
+                    "<b>🚪 Phòng: " + (feature.properties.name || "") + "</b>"
+                    + "<br>Loại: " + viRoomType(feature.properties.room_type)
+                    + "<br>Sức chứa: " + (p.capacity || "-")
+                    + "<br>Tầng/Tòa: " + ((p.floor_name || "") + (p.building_name ? " - " + p.building_name : ""))
+                    + makeImageHtml(p.blueprint_url, "Sơ đồ phòng");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết phòng", html);
+                });
+            }
+        }).addTo(map);
+
+        // Lớp Thiết bị
+        var equipmentLayer = L.geoJSON(equipmentData, {
+            pointToLayer: equipmentPoint,
+            onEachFeature: function (feature, layer) {
+                var st = feature.properties && feature.properties.status;
+                var viStatus = VI_EQUIPMENT_STATUS[st] || st || "";
+                var p = feature.properties || {};
+                var html =
+                    "<b>⚙️ Thiết bị: " + (feature.properties.code || "") + "</b>"
+                    + "<br>Tên: " + (feature.properties.name || "")
+                    + "<br>Trạng thái: " + viStatus
+                    + "<br>Phòng/Tầng/Tòa: " + ((p.room_name || "") + (p.floor_name ? " - " + p.floor_name : "") + (p.building_name ? " - " + p.building_name : ""))
+                    + makeImageHtml(p.blueprint_url, "Sơ đồ phòng chứa thiết bị");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết thiết bị", html);
+                });
+            }
+        }).addTo(map);
+
+        // Lớp riêng để hiển thị kết quả truy vấn
+        var radiusResultLayer = L.layerGroup().addTo(map);
+        var advancedResultLayer = L.layerGroup().addTo(map);
 
         // --- F. Bộ điều khiển Layer ---
         var overlayMaps = {
             "Tòa nhà": buildingsLayer,
+            "Phòng": roomsLayer,
             "Cây xanh": treesLayer,
+            "Thiết bị": equipmentLayer,
             "Sự cố": incidentsLayer
         };
         L.control.layers(null, overlayMaps).addTo(map);
+
+        // Khi mở map: tự focus vào vùng có dữ liệu để không bị lệch khỏi khu vực hạ tầng
+        if (!hasUrlFocus) {
+            try {
+                var allDataGroup = L.featureGroup([
+                    buildingsLayer,
+                    roomsLayer,
+                    treesLayer,
+                    equipmentLayer,
+                    incidentsLayer
+                ]);
+                var b = allDataGroup.getBounds();
+                if (b && b.isValid()) {
+                    map.fitBounds(b, { padding: [30, 30], maxZoom: 19 });
+                } else {
+                    map.setView([10.7984, 106.6655], 19);
+                }
+            } catch (e) {
+                map.setView([10.7984, 106.6655], 19);
+            }
+        }
+
+        // Helper: ẩn tất cả lớp trừ tòa nhà, chỉ giữ lại layer kết quả cần hiển thị
+        function hideAllExceptBuildings() {
+            if (!map.hasLayer(buildingsLayer)) {
+                map.addLayer(buildingsLayer);
+            }
+            [treesLayer, roomsLayer, equipmentLayer, incidentsLayer].forEach(function (layer) {
+                if (map.hasLayer(layer)) {
+                    map.removeLayer(layer);
+                }
+            });
+        }
+
+        // Helper: hiển thị lại tất cả lớp gốc, xóa lớp kết quả
+        function showAllBaseLayers() {
+            [buildingsLayer, treesLayer, roomsLayer, equipmentLayer, incidentsLayer].forEach(function (layer) {
+                if (!map.hasLayer(layer)) {
+                    map.addLayer(layer);
+                }
+            });
+            radiusResultLayer.clearLayers();
+            advancedResultLayer.clearLayers();
+        }
+
+        // --- G. Tool: Truy vấn bán kính ---
+
+        function runRadiusSearchAt(latlng) {
+            if (!latlng) return;
+
+            var radius = prompt("Nhập bán kính cần tìm (m):", "20");
+            if (!radius) return;
+
+            // Chọn lớp muốn hiển thị trong bán kính:
+            // trees = cây xanh, rooms = phòng, devices = thiết bị
+            var layersInput = prompt(
+                "Nhập các lớp muốn hiển thị trong bán kính (cách nhau bằng dấu phẩy):\n" +
+                    "- trees = Cây xanh\n" +
+                    "- rooms = Phòng học / phòng\n" +
+                    "- devices = Thiết bị\n\n" +
+                    "Ví dụ: trees,rooms hoặc trees,devices,rooms",
+                "trees,devices,rooms"
+            );
+            if (layersInput === null) return;
+            var layers = layersInput.trim();
+            if (!layers) {
+                layers = "trees,devices,rooms";
+            }
+
+            // Nếu có chọn cây xanh / thiết bị thì cho phép lọc theo trạng thái
+            var layerSet = new Set(
+                layers
+                    .split(",")
+                    .map(function (s) {
+                        return s.trim();
+                    })
+                    .filter(Boolean)
+            );
+
+            var allowedTreeStatuses = new Set(["good", "diseased", "dangerous"]);
+            var allowedDeviceStatuses = new Set(["good", "broken", "maintenance"]);
+
+            if (layerSet.has("trees")) {
+                var treeStatusInput = prompt(
+                    "Chọn trạng thái cây muốn hiển thị (cách nhau bằng dấu phẩy):\n" +
+                        "- good = Khỏe\n" +
+                        "- diseased = Bệnh\n" +
+                        "- dangerous = Nguy hiểm\n\n" +
+                        "Ví dụ: diseased,dangerous (chỉ hiện cây bệnh + nguy hiểm)\n" +
+                        "Để mặc định: good,diseased,dangerous",
+                    "good,diseased,dangerous"
+                );
+                if (treeStatusInput !== null && treeStatusInput.trim()) {
+                    allowedTreeStatuses = new Set(
+                        treeStatusInput
+                            .split(",")
+                            .map(function (s) {
+                                return s.trim();
+                            })
+                            .filter(Boolean)
+                    );
+                }
+            }
+
+            if (layerSet.has("devices")) {
+                var deviceStatusInput = prompt(
+                    "Chọn trạng thái thiết bị muốn hiển thị (cách nhau bằng dấu phẩy):\n" +
+                        "- good = Tốt\n" +
+                        "- broken = Hỏng\n" +
+                        "- maintenance = Đang sửa\n\n" +
+                        "Ví dụ: broken,maintenance (chỉ hiện thiết bị hỏng / đang sửa)\n" +
+                        "Để mặc định: good,broken,maintenance",
+                    "good,broken,maintenance"
+                );
+                if (deviceStatusInput !== null && deviceStatusInput.trim()) {
+                    allowedDeviceStatuses = new Set(
+                        deviceStatusInput
+                            .split(",")
+                            .map(function (s) {
+                                return s.trim();
+                            })
+                            .filter(Boolean)
+                    );
+                }
+            }
+
+            fetch(
+                radiusSearchUrl +
+                    "?lat=" +
+                    encodeURIComponent(latlng.lat) +
+                    "&lng=" +
+                    encodeURIComponent(latlng.lng) +
+                    "&radius=" +
+                    encodeURIComponent(radius) +
+                    "&layers=" +
+                    encodeURIComponent(layers)
+            )
+                .then((res) => res.json())
+                .then(function (data) {
+                    radiusResultLayer.clearLayers();
+
+                    // Ẩn tất cả lớp trừ tòa nhà, chỉ hiển thị kết quả truy vấn
+                    hideAllExceptBuildings();
+                    if (!map.hasLayer(radiusResultLayer)) {
+                        map.addLayer(radiusResultLayer);
+                    }
+
+                    // Vẽ vòng tròn bán kính
+                    L.circle(latlng, {
+                        radius: parseFloat(radius),
+                        color: "#2e7d32",
+                        weight: 2,
+                        fillColor: "#a5d6a7",
+                        fillOpacity: 0.15,
+                    }).addTo(radiusResultLayer);
+
+                    if (data.trees) {
+                        // Lọc theo trạng thái cây được chọn
+                        var filteredTrees = {
+                            type: "FeatureCollection",
+                            features: (data.trees.features || []).filter(function (f) {
+                                var st = f.properties && f.properties.health_status;
+                                return allowedTreeStatuses.has(st);
+                            }),
+                        };
+
+                        L.geoJSON(filteredTrees, {
+                            pointToLayer: treePoint,
+                            onEachFeature: function (feature, layer) {
+                                var status = feature.properties.health_status;
+                                var icon = "🌳";
+                                if (status == "dangerous") icon = "⚠️";
+                                var viStatus = VI_TREE_STATUS[status] || status;
+                                var html =
+                                    "<b>" +
+                                        icon +
+                                        " Cây: " +
+                                        feature.properties.species +
+                                        "</b>" +
+                                        "<br>Mã: " +
+                                        feature.properties.code +
+                                        "<br>Tình trạng: " +
+                                        viStatus;
+                                layer.bindPopup(html);
+                                layer.on("click", function (e) {
+                                    handleFeatureClick(e, "Chi tiết cây (kết quả truy vấn)", html);
+                                });
+                            },
+                        }).addTo(radiusResultLayer);
+                    }
+
+                    if (data.equipment) {
+                        // Lọc theo trạng thái thiết bị được chọn
+                        var filteredEquip = {
+                            type: "FeatureCollection",
+                            features: (data.equipment.features || []).filter(function (f) {
+                                var st = f.properties && f.properties.status;
+                                return allowedDeviceStatuses.has(st);
+                            }),
+                        };
+
+                        L.geoJSON(filteredEquip, {
+                            pointToLayer: equipmentPoint,
+                            onEachFeature: function (feature, layer) {
+                                var p = feature.properties || {};
+                                var viStatus = VI_EQUIPMENT_STATUS[p.status] || p.status || "";
+                                var html =
+                                    "<b>⚙️ Thiết bị: " +
+                                        (feature.properties.code || "") +
+                                        "</b>" +
+                                        "<br>Tên: " +
+                                        (feature.properties.name || "") +
+                                        "<br>Trạng thái: " +
+                                        viStatus +
+                                        makeImageHtml(p.blueprint_url, "Sơ đồ phòng chứa thiết bị");
+                                layer.bindPopup(html);
+                                layer.on("click", function (e) {
+                                    handleFeatureClick(e, "Chi tiết thiết bị (kết quả truy vấn)", html);
+                                });
+                            },
+                        }).addTo(radiusResultLayer);
+                    }
+
+                    if (data.rooms) {
+                        L.geoJSON(data.rooms, {
+                            style: roomStyle,
+                            onEachFeature: function (feature, layer) {
+                                var p = feature.properties || {};
+                                var html =
+                                    "<b>🚪 Phòng: " +
+                                        (feature.properties.name || "") +
+                                        "</b>" +
+                                        "<br>Loại: " +
+                                        viRoomType(feature.properties.room_type) +
+                                        "<br>Sức chứa: " + (p.capacity || "-") +
+                                        "<br>Tầng/Tòa: " + ((p.floor_name || "") + (p.building_name ? " - " + p.building_name : "")) +
+                                        makeImageHtml(p.blueprint_url, "Sơ đồ phòng");
+                                layer.bindPopup(html);
+                                layer.on("click", function (e) {
+                                    handleFeatureClick(e, "Chi tiết phòng (kết quả truy vấn)", html);
+                                });
+                            },
+                        }).addTo(radiusResultLayer);
+                    }
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    alert("Không truy vấn được dữ liệu bán kính.");
+                });
+        }
+
+        document.getElementById("btn-radius-search").addEventListener("click", function () {
+            radiusMode = true;
+            map.getContainer().style.cursor = "crosshair";
+            alert("Chế độ truy vấn bán kính: hãy click lên bản đồ hoặc click trực tiếp vào đối tượng để chọn tâm tìm kiếm.");
+        });
+
+        // Nút quay lại bản đồ gốc
+        document.getElementById("btn-show-all").addEventListener("click", function () {
+            showAllBaseLayers();
+        });
+
+        map.on("click", function (e) {
+            if (!radiusMode) return;
+            radiusMode = false;
+            map.getContainer().style.cursor = "";
+            runRadiusSearchAt(e.latlng);
+        });
+
+        // --- H. Tool: Truy vấn nâng cao (cây nguy hiểm / thiết bị cần kiểm tra) ---
+        var queryResultsEl = document.getElementById("query-results");
+
+        function renderResults(title, itemsHtml) {
+            queryResultsEl.innerHTML =
+                "<strong>" +
+                title +
+                "</strong>" +
+                (itemsHtml || "<div>Không có kết quả.</div>");
+        }
+
+        document
+            .getElementById("btn-dangerous-trees")
+            .addEventListener("click", function () {
+                fetch(dangerousTreesUrl)
+                    .then((res) => res.json())
+                    .then(function (data) {
+                        advancedResultLayer.clearLayers();
+
+                        // Ẩn tất cả lớp trừ tòa nhà, chỉ hiển thị cây nguy hiểm
+                        hideAllExceptBuildings();
+                        if (!map.hasLayer(advancedResultLayer)) {
+                            map.addLayer(advancedResultLayer);
+                        }
+
+                        var items = [];
+                        if (data.features && data.features.length) {
+                            var layer = L.geoJSON(data, {
+                                pointToLayer: treePoint,
+                                onEachFeature: function (feature, layer) {
+                                    var p = feature.properties || {};
+                                    var text = (p.code || "") + " - " + (p.species || "");
+                                    items.push(
+                                        '<div class="result-item">' +
+                                            text +
+                                            "</div>"
+                                    );
+                                    layer.bindPopup("<b>Cây nguy hiểm</b><br>" + text);
+                                },
+                            }).addTo(advancedResultLayer);
+
+                            try {
+                                map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+                            } catch (e) {}
+                        }
+
+                        renderResults("Cây nguy hiểm", items.join(""));
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        alert("Không truy vấn được cây nguy hiểm.");
+                    });
+            });
+
+        document
+            .getElementById("btn-devices-check")
+            .addEventListener("click", function () {
+                fetch(devicesToCheckUrl)
+                    .then((res) => res.json())
+                    .then(function (data) {
+                        advancedResultLayer.clearLayers();
+
+                        // Ẩn tất cả lớp trừ tòa nhà, chỉ hiển thị thiết bị cần kiểm tra
+                        hideAllExceptBuildings();
+                        if (!map.hasLayer(advancedResultLayer)) {
+                            map.addLayer(advancedResultLayer);
+                        }
+
+                        var items = [];
+                        if (data.features && data.features.length) {
+                            var layer = L.geoJSON(data, {
+                                pointToLayer: equipmentPoint,
+                                onEachFeature: function (feature, layer) {
+                                    var p = feature.properties || {};
+                                    var text =
+                                        (p.code || "") +
+                                        " - " +
+                                        (p.name || "") +
+                                        " (" +
+                                        (p.status || "") +
+                                        ", phòng " +
+                                        (p.room_name || "?") +
+                                        ")";
+                                    items.push(
+                                        '<div class="result-item">' +
+                                            text +
+                                            "</div>"
+                                    );
+                                    var html =
+                                        "<b>Thiết bị cần kiểm tra</b><br>" +
+                                        text +
+                                        makeImageHtml(p.blueprint_url, "Sơ đồ phòng chứa thiết bị");
+                                    layer.bindPopup(html);
+                                    layer.on("click", function (e) {
+                                        handleFeatureClick(e, "Chi tiết thiết bị cần kiểm tra", html);
+                                    });
+                                },
+                            }).addTo(advancedResultLayer);
+
+                            try {
+                                map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+                            } catch (e) {}
+                        }
+
+                        renderResults("Thiết bị cần kiểm tra/bảo trì", items.join(""));
+                    })
+                    .catch(function (err) {
+                        console.error(err);
+                        alert("Không truy vấn được thiết bị cần kiểm tra.");
+                    });
+            });
+
+        // --- I. Tìm kiếm sự cố trên bản đồ (client-side từ incidentsData) ---
+        document
+            .getElementById("btn-search-incidents")
+            .addEventListener("click", function () {
+                var q = document
+                    .getElementById("incident-search-input")
+                    .value.trim()
+                    .toLowerCase();
+
+                // Luôn clear kết quả cũ trước khi tìm mới
+                advancedResultLayer.clearLayers();
+                radiusResultLayer.clearLayers();
+
+                // Nếu không nhập gì: hiển thị tất cả sự cố
+                var allFeatures = incidentsData.features || [];
+                var filtered = allFeatures.filter(function (f) {
+                    if (!q) return true;
+                    var p = f.properties || {};
+                    var title = (p.title || "").toLowerCase();
+                    var status = (p.status || "").toLowerCase();
+                    var priority = (p.priority || "").toLowerCase();
+                    var viPriority = (p.vi_priority || "").toLowerCase();
+                    var viStatus = (p.vi_status || "").toLowerCase();
+                    var incidentType = (p.incident_type || "").toLowerCase();
+                    var incidentTypeCode = (p.incident_type_code || "").toLowerCase();
+                    var assetType = (p.asset_type || "").toLowerCase();
+                    var assetSearchText = (p.asset_search_text || "").toLowerCase();
+                    // Gõ: cao/trung bình/thấp, mở/đang xử lý/đã đóng, tên tài sản (me tây, loa, pc đài loan...)
+                    return (
+                        title.indexOf(q) !== -1 ||
+                        status.indexOf(q) !== -1 ||
+                        priority.indexOf(q) !== -1 ||
+                        viPriority.indexOf(q) !== -1 ||
+                        viStatus.indexOf(q) !== -1 ||
+                        incidentType.indexOf(q) !== -1 ||
+                        incidentTypeCode.indexOf(q) !== -1 ||
+                        assetType.indexOf(q) !== -1 ||
+                        assetSearchText.indexOf(q) !== -1
+                    );
+                });
+
+                if (!filtered.length) {
+                    renderResults("Kết quả tìm kiếm sự cố", "<div>Không tìm thấy sự cố phù hợp.</div>");
+                    return;
+                }
+
+                // Chỉ hiển thị sự cố tìm được + tòa nhà, ẩn mọi thứ khác
+                radiusResultLayer.clearLayers();
+                hideAllExceptBuildings();
+                if (!map.hasLayer(advancedResultLayer)) {
+                    map.addLayer(advancedResultLayer);
+                }
+
+                var collection = {
+                    type: "FeatureCollection",
+                    features: filtered,
+                };
+
+                var items = [];
+                var layer = L.geoJSON(collection, {
+                    pointToLayer: incidentPoint,
+                    onEachFeature: function (feature, layer) {
+                        var p = feature.properties || {};
+                        var text =
+                            (p.title || "") +
+                            " (" +
+                            (VI_INCIDENT_STATUS[p.status] || p.status || "") +
+                            ", " +
+                            (VI_INCIDENT_PRIORITY[p.priority] || p.priority || "") +
+                            ")";
+                        items.push(
+                            '<div class="result-item">' +
+                                text +
+                                "</div>"
+                        );
+                        var html =
+                            "<b>Sự cố</b><br>" +
+                            text +
+                            makeImageHtml(p.image_url, "Hình ảnh liên quan sự cố");
+                        layer.bindPopup(html);
+                        layer.on("click", function (e) {
+                            handleFeatureClick(e, "Chi tiết sự cố", html);
+                        });
+                    },
+                }).addTo(advancedResultLayer);
+
+                try {
+                    map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+                } catch (e) {}
+
+                renderResults("Kết quả tìm kiếm sự cố", items.join(""));
+            });
+
+        // --- J. Chú thích bản đồ đóng/mở ---
+        (function () {
+            var legend = document.getElementById("map-legend");
+            var toggle = document.getElementById("legend-toggle");
+            var body = document.getElementById("legend-body");
+            if (legend && toggle && body) {
+                toggle.addEventListener("click", function () {
+                    legend.classList.toggle("collapsed");
+                    toggle.setAttribute(
+                        "aria-expanded",
+                        legend.classList.contains("collapsed") ? "false" : "true"
+                    );
+                });
+            }
+        })();
 
     </script>
 </body>
