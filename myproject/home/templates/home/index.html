@@ -1,0 +1,631 @@
+{% load static %}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hệ thống Quản lý Cơ sở hạ tầng - WebGIS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root{
+      --brand:#2e7d32;
+      --brand-dark:#1b5e20;
+      --brand-soft:#e8f5e9;
+      --accent:#43a047;
+      --ink:#0f172a;
+      --muted:#475569;
+      --card:#ffffff;
+      --soft:#f4faf4;
+      --border:rgba(27, 94, 32, .12);
+      --shadow: 0 12px 32px rgba(15, 46, 20, .08);
+    }
+    body{ color:var(--ink); background: var(--soft); }
+    .navbar-blur{
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand-badge{ display:flex; align-items:center; gap:10px; min-width: 0; }
+    .brand-badge img{
+      width:40px; height:40px; object-fit:contain;
+      border-radius: 10px; background:#fff; border: 1px solid var(--border);
+    }
+    .brand-title{
+      font-weight:800; letter-spacing:.2px; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; max-width: 58vw;
+    }
+    .hero{
+      position:relative;
+      padding: 56px 0 40px;
+      overflow:hidden;
+      background:
+        radial-gradient(900px 420px at 15% 10%, rgba(46,125,50,.18), transparent 60%),
+        radial-gradient(900px 420px at 85% 0%, rgba(67,160,71,.15), transparent 55%),
+        linear-gradient(180deg, #ffffff, var(--soft));
+      border-bottom: 1px solid var(--border);
+    }
+    .hero .container{ position:relative; }
+    .hero h1{ font-weight:900; line-height:1.08; letter-spacing: -0.4px; }
+    .hero p{ color:var(--muted); font-size: 1.05rem; }
+    .btn-brand{
+      --bs-btn-bg: var(--brand);
+      --bs-btn-border-color: var(--brand);
+      --bs-btn-hover-bg: var(--brand-dark);
+      --bs-btn-hover-border-color: var(--brand-dark);
+      --bs-btn-color: #fff;
+    }
+    .btn-outline-brand{
+      --bs-btn-color: var(--brand);
+      --bs-btn-border-color: rgba(46,125,50,.45);
+      --bs-btn-hover-bg: rgba(46,125,50,.08);
+    }
+    .glass{
+      background: rgba(255,255,255,.92);
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      border-radius: 18px;
+    }
+    .search-bar .form-control{
+      border-radius: 12px;
+      border: 1px solid rgba(27,94,32,.25);
+    }
+    .search-bar .btn{ border-radius: 12px; }
+    .stat-card{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      height: 100%;
+      box-shadow: 0 8px 24px rgba(15, 46, 20, .06);
+      border-bottom: 4px solid transparent;
+    }
+    .stat-card.c1{ border-bottom-color:#2d6a4f; }
+    .stat-card.c2{ border-bottom-color:#d97706; }
+    .stat-card.c3{ border-bottom-color:#2563eb; }
+    .stat-card.c4{ border-bottom-color:#dc2626; }
+    .stat-number{ font-weight: 900; font-size: 1.75rem; letter-spacing: -0.3px; color: var(--brand-dark); }
+    .stat-label{ color: var(--muted); font-weight: 600; font-size: .9rem; }
+    .mini-bar{
+      height: 8px; border-radius: 999px;
+      background: rgba(15,23,42,.08);
+      overflow: hidden;
+    }
+    .mini-bar > span{ display:block; height:100%; border-radius: 999px; }
+    .section{ padding: 48px 0; }
+    .section-kicker{
+      font-size: .75rem; font-weight: 800; letter-spacing: .12em;
+      text-transform: uppercase; color: #c2410c;
+    }
+    .section-title{ font-weight: 900; letter-spacing: -0.3px; margin-bottom: 6px; color: #0c4a6e; }
+    .section-sub{ color: var(--muted); margin-bottom: 22px; }
+    .feature{
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      height:100%;
+      box-shadow: 0 8px 20px rgba(15, 46, 20, .05);
+    }
+    .icon{
+      width:42px; height:42px; border-radius: 14px;
+      display:grid; place-items:center;
+      background: var(--brand-soft);
+      border: 1px solid var(--border);
+      color: var(--brand-dark);
+      font-weight: 900;
+      margin-bottom: 10px;
+    }
+    .video-wrap{
+      border-radius: 18px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: var(--shadow);
+      background: #0f172a;
+    }
+    .video-wrap video{ width:100%; display:block; max-height: 420px; object-fit: cover; }
+    .maint-row{
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      box-shadow: 0 4px 14px rgba(15, 46, 20, .04);
+    }
+    .badge-soft{ background: var(--brand-soft); color: var(--brand-dark); border: 1px solid var(--border); }
+    .bar-row{ margin-bottom: 12px; }
+    .bar-row .label{ font-size: .9rem; font-weight: 600; }
+    .bar-track{
+      height: 10px; border-radius: 999px;
+      background: rgba(15,23,42,.06);
+      overflow: hidden;
+    }
+    .bar-fill{ height:100%; border-radius: 999px; }
+    .kpi-mini{
+      background: #faf8f5;
+      border: 1px solid rgba(15,23,42,.08);
+      border-radius: 14px;
+      padding: 16px;
+      height: 100%;
+    }
+    .news-card{
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #fff;
+      box-shadow: 0 8px 24px rgba(15, 46, 20, .06);
+      height: 100%;
+    }
+    .news-card .thumb{
+      height: 120px;
+      background: linear-gradient(135deg, var(--brand-soft), #c8e6c9);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 2rem;
+    }
+    .news-card .body{ padding: 16px; }
+    footer.site-footer{
+      background: linear-gradient(180deg, #1b4332, #0d2818);
+      color: #e8f5e9;
+      padding: 48px 0 24px;
+      margin-top: 20px;
+    }
+    footer.site-footer a{ color: #c8e6c9; text-decoration: none; }
+    footer.site-footer a:hover{ text-decoration: underline; color: #fff; }
+    .footer-bottom{
+      border-top: 1px solid rgba(255,255,255,.12);
+      margin-top: 28px; padding-top: 18px;
+      font-size: .85rem; color: rgba(232,245,233,.75);
+    }
+    .room-detail-img{
+      max-height: 280px;
+      object-fit: contain;
+      background: #f8fafc;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+
+  <nav class="navbar navbar-expand-lg navbar-blur sticky-top">
+    <div class="container py-1">
+      <a class="navbar-brand brand-badge" href="{% url 'home' %}">
+        <img src="{% static 'img/logo-dtnmt.png' %}" alt="Logo">
+        <span class="brand-title">Hệ thống Quản lý Cơ sở hạ tầng - WebGIS</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMain">
+        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Trang chủ</a></li>
+          <li class="nav-item"><a class="nav-link" href="#tinh-nang">Tính năng</a></li>
+          <li class="nav-item"><a class="nav-link" href="#gioi-thieu">Giới thiệu</a></li>
+          <li class="nav-item"><a class="nav-link" href="#tong-quan">Tổng quan</a></li>
+
+          {% if user.is_authenticated %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'map_view' %}">Bản đồ</a></li>
+            {% if is_admin %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'admin_dashboard' %}">Quản trị</a></li>
+            {% endif %}
+            {% if is_facility %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'facility_dashboard' %}">CSVC</a></li>
+            {% endif %}
+            {% if is_teacher %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'teacher_dashboard' %}">Giảng viên</a></li>
+            {% endif %}
+            <li class="nav-item ms-lg-2">
+              <a class="btn btn-outline-brand btn-sm" href="{% url 'logout' %}">Đăng xuất</a>
+            </li>
+          {% else %}
+            <li class="nav-item ms-lg-2">
+              <a class="btn btn-brand btn-sm" href="{% url 'login' %}">Đăng nhập</a>
+            </li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container">
+      <div class="row g-4 align-items-start">
+        <div class="col-12 col-lg-7">
+          <div class="glass p-4 p-lg-5">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+              <span class="badge badge-soft">ĐH Tài nguyên &amp; Môi trường TP.HCM</span>
+              <span class="badge text-bg-success">WebGIS</span>
+            </div>
+            <h1 class="mb-3">Chào mừng đến với Hệ thống Quản lý Cơ sở vật chất thông minh</h1>
+            <p class="mb-4">
+              Tra cứu phòng học, theo dõi hạ tầng và phối hợp bảo trì — minh bạch, trực quan, theo phân quyền.
+            </p>
+
+            <form class="search-bar mb-3" method="get" action="{% url 'home' %}">
+              <label class="form-label fw-semibold mb-2">Tìm phòng học</label>
+              <div class="input-group input-group-lg">
+                <input type="search" name="q" value="{{ room_search_q }}"
+                       class="form-control" placeholder="Nhập tên phòng (ví dụ: B204, Lab A1...)"
+                       autocomplete="off">
+                <button class="btn btn-brand px-4" type="submit">Tìm</button>
+              </div>
+              <div class="form-text">Chỉ tìm theo <strong>phòng học</strong> trong cơ sở dữ liệu.</div>
+            </form>
+
+            {% if room_search_q or request.GET.room_id %}
+              {% if searched_room %}
+                <div class="border rounded-3 p-3 p-md-4 mt-2" style="background: var(--brand-soft); border-color: rgba(27,94,32,.2) !important;">
+                  <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+                    <div>
+                      <div class="fw-bold fs-5">{{ searched_room.name }}</div>
+                      <div class="text-muted small">
+                        Loại: {{ searched_room.get_room_type_display }}
+                        {% if searched_room.capacity %} · Sức chứa: {{ searched_room.capacity }}{% endif %}
+                      </div>
+                    </div>
+                    <a class="btn btn-sm btn-outline-secondary" href="{% url 'home' %}">Đóng / tìm khác</a>
+                  </div>
+                  <dl class="row small mb-0">
+                    <dt class="col-sm-3">Tòa / dãy</dt>
+                    <dd class="col-sm-9">{{ searched_room.floor.building.name }}</dd>
+                    <dt class="col-sm-3">Tầng</dt>
+                    <dd class="col-sm-9">
+                      {{ searched_room.floor.name }} (mức {{ searched_room.floor.level }})
+                    </dd>
+                  </dl>
+                  {% if room_blueprint_url %}
+                    <div class="mt-3">
+                      <div class="fw-semibold small mb-2">Sơ đồ / hình ảnh phòng</div>
+                      <img class="room-detail-img w-100" src="{{ room_blueprint_url }}" alt="Sơ đồ phòng {{ searched_room.name }}">
+                    </div>
+                  {% else %}
+                    <p class="text-muted small mt-3 mb-0">Chưa có hình sơ đồ phòng trong hệ thống.</p>
+                  {% endif %}
+                </div>
+              {% elif room_search_results %}
+                <div class="mt-3">
+                  <div class="fw-semibold mb-2">Có {{ room_search_results|length }} kết quả — chọn một phòng:</div>
+                  <div class="list-group">
+                    {% for r in room_search_results %}
+                      <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+                         href="{% url 'home' %}?q={{ room_search_q|urlencode }}&amp;room_id={{ r.id }}">
+                        <span>
+                          <strong>{{ r.name }}</strong>
+                          <span class="text-muted small ms-2">{{ r.floor.building.name }} · {{ r.floor.name }}</span>
+                        </span>
+                        <span class="badge bg-success rounded-pill">Xem</span>
+                      </a>
+                    {% endfor %}
+                  </div>
+                  <a class="btn btn-link btn-sm px-0 mt-2" href="{% url 'home' %}">Xóa tìm kiếm</a>
+                </div>
+              {% elif room_search_q %}
+                <div class="alert alert-warning mt-3 mb-0 py-2">Không tìm thấy phòng phù hợp.</div>
+                <a class="btn btn-link btn-sm px-0" href="{% url 'home' %}">Đóng</a>
+              {% endif %}
+            {% endif %}
+
+            <div class="d-flex flex-wrap gap-2 mt-4">
+              {% if user.is_authenticated %}
+                <a class="btn btn-brand" href="{% url 'map_view' %}">Mở bản đồ</a>
+              {% else %}
+                <a class="btn btn-brand" href="{% url 'login' %}">Đăng nhập để bắt đầu</a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-lg-5">
+          <div class="row g-3">
+            <div class="col-6">
+              <div class="stat-card c1">
+                <div class="stat-number">{{ stats.buildings }}</div>
+                <div class="stat-label">Tòa nhà</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="stat-card c1">
+                <div class="stat-number">{{ stats.rooms }}</div>
+                <div class="stat-label">Phòng học / chức năng</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="stat-card c3">
+                <div class="stat-number">{{ stats.equipment }}</div>
+                <div class="stat-label">Thiết bị</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="stat-card c1">
+                <div class="stat-number">{{ stats.trees }}</div>
+                <div class="stat-label">Cây xanh</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="section" id="tinh-nang">
+    <div class="container">
+      <div class="section-kicker">Nền tảng số</div>
+      <h2 class="section-title">Chức năng cốt lõi</h2>
+      <div class="section-sub">Phục vụ Admin, nhân viên CSVC và giảng viên sau đăng nhập.</div>
+      <div class="row g-3">
+        <div class="col-12 col-md-6 col-lg-3">
+          <div class="feature">
+            <div class="icon">Map</div>
+            <div class="fw-bold mb-1">Bản đồ WebGIS</div>
+            <div class="text-muted small">Xem tòa nhà, phòng, thiết bị và cây xanh trên nền bản đồ.</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <div class="feature">
+            <div class="icon">⌕</div>
+            <div class="fw-bold mb-1">Tra cứu phòng</div>
+            <div class="text-muted small">Tìm phòng theo tên, xem tòa — tầng — sơ đồ ngay tại trang chủ.</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <div class="feature">
+            <div class="icon">!</div>
+            <div class="fw-bold mb-1">Sự cố &amp; báo cáo</div>
+            <div class="text-muted small">Ghi nhận sự cố, ưu tiên xử lý và theo dõi trạng thái.</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-lg-3">
+          <div class="feature">
+            <div class="icon">🛠</div>
+            <div class="fw-bold mb-1">Bảo trì tài sản</div>
+            <div class="text-muted small">Lịch sử bảo trì, chi phí và phân công nhân sự CSVC.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section pt-0" id="gioi-thieu">
+    <div class="container">
+      <div class="row g-4 align-items-center">
+        <div class="col-12 col-lg-5">
+          <div class="section-kicker">Giới thiệu</div>
+          <h2 class="section-title">Trường Đại học Tài nguyên và Môi trường TP.HCM</h2>
+          <div class="section-sub">
+          Trường Đại học Tài nguyên và Môi trường TP.HCM (HCMUNRE) là cơ sở đào tạo chuyên sâu trong lĩnh vực tài nguyên, môi trường và phát triển bền vững. Nhà trường định hướng xây dựng môi trường học tập hiện đại, xanh và thân thiện với sinh viên. Bên cạnh đó, hệ thống hỗ trợ số hoá cơ sở vật chất được triển khai nhằm giúp tra cứu nhanh chóng và quản lý tập trung hiệu quả. Điều này góp phần nâng cao chất lượng học tập, nghiên cứu và trải nghiệm của người học.
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            {% if not user.is_authenticated %}
+              <a class="btn btn-brand" href="{% url 'login' %}">Đăng nhập</a>
+            {% else %}
+              {% if is_admin %}
+                <a class="btn btn-outline-brand" href="{% url 'admin_dashboard' %}">Quản trị</a>
+              {% elif is_facility %}
+                <a class="btn btn-outline-brand" href="{% url 'facility_dashboard' %}">CSVC</a>
+              {% elif is_teacher %}
+                <a class="btn btn-outline-brand" href="{% url 'teacher_dashboard' %}">Giảng viên</a>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+        <div class="col-12 col-lg-7">
+          <div class="video-wrap">
+            <video controls playsinline poster="{% static 'img/tnmt.jpg' %}">
+              <source src="{% static 'videos/tnmt.mp4' %}" type="video/mp4">
+              Trình duyệt không hỗ trợ video HTML5.
+            </video>
+          </div>
+          <p class="small text-muted mt-2 mb-0">
+              Hình ảnh và video minh họa môi trường học tập tại trường, thể hiện cam kết phát triển bền vững và hiện đại hóa cơ sở vật chất.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section bg-white border-top border-bottom" id="tong-quan" style="border-color: var(--border) !important;">
+    <div class="container">
+      <div class="section-kicker">Tổng quan hạ tầng</div>
+      <h2 class="section-title">Tình trạng cơ sở vật chất</h2>
+      <div class="section-sub">Số liệu cập nhật trực tiếp từ cơ sở dữ liệu hệ thống.</div>
+
+      <div class="row g-3 mb-5">
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="stat-card c1">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="stat-label">Công trình / tòa nhà</span>
+              <span class="rounded-3 p-2" style="background: var(--brand-soft); font-size: 1.1rem;">🏗</span>
+            </div>
+            <div class="stat-number">{{ stats.buildings }}</div>
+            <div class="mini-bar mt-2"><span style="width: 92%; background: #2d6a4f;"></span></div>
+            <div class="small text-muted mt-2">Tổng số tòa được quản lý trên bản đồ.</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="stat-card c2">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="stat-label">Yêu cầu / sự cố chờ xử lý</span>
+              <span class="rounded-3 p-2" style="background: #fff7ed; font-size: 1.1rem;">🔧</span>
+            </div>
+            <div class="stat-number">{{ pending_total }}</div>
+            <div class="mini-bar mt-2"><span style="width: {{ pending_bar_pct }}%; background: #d97706;"></span></div>
+            <div class="small text-muted mt-2">Mở: {{ inc_open }} · Đang xử lý: {{ inc_processing }}</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="stat-card c3">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="stat-label">Thiết bị (trạng thái tốt)</span>
+              <span class="rounded-3 p-2" style="background: #eff6ff; font-size: 1.1rem;">💻</span>
+            </div>
+            <div class="stat-number">{{ stats.equipment }}</div>
+            <div class="mini-bar mt-2"><span style="width: {{ eq_good_pct }}%; background: #2563eb;"></span></div>
+            <div class="small text-muted mt-2">{{ eq_good_pct }}% thiết bị đang ở trạng thái “Tốt”.</div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+          <div class="stat-card c4">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="stat-label">Sự cố ưu tiên cao (mở)</span>
+              <span class="rounded-3 p-2" style="background: #fef2f2; font-size: 1.1rem;">⚡</span>
+            </div>
+            <div class="stat-number">{{ inc_high_open }}</div>
+            <div class="mini-bar mt-2"><span style="width: {{ urgent_bar_pct }}%; background: #dc2626;"></span></div>
+            <div class="small text-muted mt-2">Theo dõi và xử lý kịp thời.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-4">
+        <div class="col-12 col-lg-6">
+          <div class="section-kicker">Theo dõi bảo trì</div>
+          <h3 class="h4 fw-bold" style="color: #0c4a6e;">Lịch &amp; tình trạng gần đây</h3>
+          <p class="text-muted small">Phiếu bảo trì và sự cố mới nhất từ hệ thống.</p>
+          {% for m in maintenance_recent %}
+            <div class="maint-row">
+              <div class="fw-semibold">{{ m.get_maintenance_type_display }} — {{ m.asset }}</div>
+              <div class="small text-muted">Ngày: {{ m.maintenance_date|date:"d/m/Y" }}{% if m.staff %} · Thực hiện: {{ m.staff.username }}{% endif %}</div>
+            </div>
+          {% empty %}
+            <p class="text-muted">Chưa có phiếu bảo trì.</p>
+          {% endfor %}
+          <h4 class="h6 fw-bold mt-4 mb-2" style="color: #0c4a6e;">Sự cố ghi nhận</h4>
+          {% for inc in incidents_recent %}
+            {% if forloop.counter <= 5 %}
+            <div class="maint-row">
+              <div class="fw-semibold">{{ inc.title|default:"Sự cố" }}</div>
+              <div class="small text-muted">
+                {{ inc.reported_at|date:"d/m/Y H:i" }} · {{ inc.get_status_display }}
+                {% if inc.incident_type %} · {{ inc.incident_type.name }}{% endif %}
+              </div>
+            </div>
+            {% endif %}
+          {% empty %}
+            <p class="text-muted small mb-0">Chưa có sự cố.</p>
+          {% endfor %}
+        </div>
+        <div class="col-12 col-lg-6">
+          <div class="section-kicker">Phân tích sử dụng</div>
+          <h3 class="h4 fw-bold" style="color: #0c4a6e;">Phòng theo loại hình</h3>
+          <p class="text-muted small">Tỷ lệ số phòng theo từng loại (trên tổng {{ stats.rooms }} phòng).</p>
+          {% for row in room_type_chart %}
+            <div class="bar-row">
+              <div class="d-flex justify-content-between label"><span>{{ row.label }}</span><span>{{ row.pct }}%</span></div>
+              <div class="bar-track">
+                <div class="bar-fill" style="width: {{ row.pct }}%; background: linear-gradient(90deg, var(--brand), var(--accent));"></div>
+              </div>
+            </div>
+          {% empty %}
+            <p class="text-muted">Chưa có dữ liệu phòng.</p>
+          {% endfor %}
+
+          <div class="row g-2 mt-3">
+            <div class="col-6">
+              <div class="kpi-mini">
+                <div class="fs-4 fw-bold text-success">{{ eq_good_pct }}%</div>
+                <div class="small text-muted">Thiết bị hoạt động tốt</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="kpi-mini">
+                <div class="fs-4 fw-bold" style="color:#0c4a6e;">{{ incidents_closed_quarter }}</div>
+                <div class="small text-muted">Sự cố đã đóng (trong quý)</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="kpi-mini">
+                <div class="fs-4 fw-bold" style="color:#b45309;">
+                  {% if maintenance_cost_total %}
+                    {{ maintenance_cost_total|floatformat:0 }} đ
+                  {% else %}
+                    —
+                  {% endif %}
+                </div>
+                <div class="small text-muted">Tổng chi phí bảo trì (ghi nhận)</div>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="kpi-mini">
+                <div class="fs-4 fw-bold text-primary">{{ stats.rooms }}</div>
+                <div class="small text-muted">Phòng / không gian chức năng</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-5 pt-2">
+        <div class="section-kicker">Thông báo &amp; cập nhật</div>
+        <h3 class="h4 fw-bold" style="color: #0c4a6e;">Tin tức từ hệ thống</h3>
+        <div class="section-sub">Các sự cố / cập nhật gần đây (dữ liệu thật).</div>
+        <div class="row g-3">
+          {% for inc in incidents_recent %}
+            {% if forloop.counter <= 3 %}
+            <div class="col-12 col-md-4">
+              <div class="news-card">
+                <div class="thumb">📋</div>
+                <div class="body">
+                  <div class="small text-warning-emphasis fw-bold mb-1">SỰ CỐ</div>
+                  <div class="fw-bold mb-2">{{ inc.title|default:"Cập nhật sự cố" }}</div>
+                  <div class="small text-muted">🗓 {{ inc.reported_at|date:"d/m/Y" }}</div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+          {% empty %}
+            <p class="text-muted">Chưa có thông tin cập nhật.</p>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-12 col-lg-4">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <img src="{% static 'img/logo-dtnmt.png' %}" alt="" width="40" height="40" class="rounded-3 bg-white p-1">
+            <span class="fw-bold fs-5">Hệ thống quản lý CSVC</span>
+          </div>
+          <p class="small" style="color: rgba(232,245,233,.85);">
+            Nền tảng số hoá cơ sở vật chất — hướng tới môi trường học tập an toàn, minh bạch và hiệu quả.
+          </p>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="fw-bold mb-2">Chức năng</div>
+          <ul class="list-unstyled small">
+            <li class="mb-1"><a href="#tong-quan">Tổng quan CSVC</a></li>
+            <li class="mb-1"><a href="{% url 'home' %}">Tra cứu phòng</a></li>
+            {% if user.is_authenticated %}<li class="mb-1"><a href="{% url 'map_view' %}">Bản đồ</a></li>{% endif %}
+            <li class="mb-1"><a href="{% url 'login' %}">Đăng nhập</a></li>
+          </ul>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="fw-bold mb-2">Danh mục</div>
+          <ul class="list-unstyled small">
+            <li class="mb-1">Phòng học &amp; lab</li>
+            <li class="mb-1">Thiết bị</li>
+            <li class="mb-1">Cây xanh</li>
+            <li class="mb-1">Bảo trì &amp; sự cố</li>
+          </ul>
+        </div>
+        <div class="col-12 col-lg-3">
+          <div class="fw-bold mb-2">Liên hệ</div>
+          <ul class="list-unstyled small" style="color: rgba(232,245,233,.9);">
+            <li class="mb-2">📍 236B Lê Văn Sỹ, Phường Tân Sơn Hòa, TP. Hồ Chí Minh</li>
+            <li class="mb-2">📞  0379159999</li>
+            <li class="mb-2">✉️ <a href="mailto:nguyenthientan2305@gmail.com">nguyenthientan2305@gmail.com</a></li>
+            <li>🌐 <a href="https://hcmunre.edu.vn/" target="_blank" rel="noopener">hcmunre.edu.vn</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom d-flex flex-wrap justify-content-between gap-2">
+        <span>© {% now "Y" %} — Phòng Quản trị Cơ sở Vật chất. Bảo lưu mọi quyền.</span>
+        <span>Hệ thống Quản lý Cơ sở hạ tầng - WebGIS</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

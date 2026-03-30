@@ -1,10 +1,12 @@
 from django.urls import path
 from django.views.generic.base import RedirectView
 from .views import (
+    home,
     Login,
     admin_dashboard,
     facility_dashboard,
     facility_incident,
+    facility_teacher_reports_history,
     teacher_dashboard,
     radius_search,
     dangerous_trees_near_rooms,
@@ -13,12 +15,14 @@ from .views import (
 from . import admin_views
 
 urlpatterns = [
+    path("", home, name="home"),
     path('login/', Login.as_view(template_name='login.html'), name='login'),
     path('admin-dashboard/', admin_dashboard, name='admin_dashboard'),
     # /admin/ → custom admin dashboard (so /admin/users/ etc. are our pages)
     path('admin/', RedirectView.as_view(pattern_name='admin_dashboard')),
     path('facility/', facility_dashboard, name='facility_dashboard'),
     path('facility/incidents/', facility_incident, name='facility_incident'),
+    path('facility/teacher-reports/', facility_teacher_reports_history, name='facility_teacher_reports_history'),
     path('teacher/', teacher_dashboard, name='teacher_dashboard'),
 
     # Admin CRUD - Buildings

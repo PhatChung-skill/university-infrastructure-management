@@ -17,7 +17,7 @@ def admin_required(view_func):
         is_django_admin = getattr(request.user, "is_superuser", False) or getattr(request.user, "is_staff", False)
         is_app_admin = app_user and app_user.role and app_user.role.name.lower() == "admin"
         if not (is_django_admin or is_app_admin):
-            return redirect("map_view")
+            return redirect("home")
 
         return view_func(request, *args, **kwargs)
 

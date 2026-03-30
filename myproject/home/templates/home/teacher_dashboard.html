@@ -61,6 +61,9 @@
       <div class="collapse navbar-collapse" id="navbarTeacher">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item">
+            <a class="nav-link" href="{% url 'home' %}">Trang chủ</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link active" aria-current="page" href="{% url 'teacher_dashboard' %}">Danh sách phòng</a>
           </li>
           <li class="nav-item">
@@ -78,6 +81,69 @@
   <main class="container pb-5">
     <div class="row justify-content-center mb-4">
       <div class="col-lg-10">
+        <div class="card card-teacher mb-3">
+          <div class="card-teacher-header">
+            <h5 class="mb-0">Báo cáo sự cố nhanh (text)</h5>
+            <small class="d-block mt-1">
+              Gửi tới bộ phận CSVC. Khi CSVC đã xem, thông báo trên trang này sẽ được cập nhật.
+            </small>
+          </div>
+          <div class="card-body">
+            {% if messages %}
+              {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} py-2 mb-3">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+
+            <form method="post" novalidate>
+              {% csrf_token %}
+              <div class="mb-3">
+                <label class="form-label">{{ teacher_quick_report_form.message.label }}</label>
+                {{ teacher_quick_report_form.message }}
+                {% for error in teacher_quick_report_form.message.errors %}
+                  <div class="text-danger small">{{ error }}</div>
+                {% endfor %}
+              </div>
+              <div class="d-flex justify-content-end">
+                <button type="submit" class="btn btn-teacher-primary">
+                  Gửi báo cáo nhanh
+                </button>
+              </div>
+            </form>
+
+            <hr class="my-4">
+
+            {% if latest_quick_report %}
+              {% if latest_quick_report.is_seen %}
+                <div class="alert alert-success py-2 mb-3">
+                  Chúng tôi đã xem xét sự cố này vào
+                  <strong>{{ latest_quick_report.seen_at|date:"d/m/Y H:i" }}</strong>.
+                </div>
+              {% else %}
+                <div class="alert alert-info py-2 mb-3">
+                  Chúng tôi đang xem xét sự cố này, vui lòng chờ CSVC xử lý.
+                </div>
+              {% endif %}
+
+              <div class="small text-muted mb-2">
+                Thời gian: {{ latest_quick_report.created_at|date:"d/m/Y H:i" }} |
+                Người gửi:
+                {% if latest_quick_report.sender %}
+                  {{ latest_quick_report.sender.username }}
+                {% else %}
+                  -
+                {% endif %}
+              </div>
+
+              <div style="white-space: pre-wrap;">
+                {{ latest_quick_report.message|linebreaksbr }}
+              </div>
+            {% else %}
+              <p class="text-muted mb-0">Chưa có báo cáo nhanh nào.</p>
+            {% endif %}
+          </div>
+        </div>
+
         <div class="card card-teacher mb-3">
           <div class="card-teacher-header">
             <h5 class="mb-0">Danh sách phòng học & tình trạng thiết bị</h5>

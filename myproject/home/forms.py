@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
-from .models import Maintenance, Incident
+from .models import Maintenance, Incident, QuickIncidentReport
 
 
 def _apply_bootstrap(form: forms.Form) -> None:
@@ -97,3 +97,23 @@ class FacilityMaintenanceForm(forms.ModelForm):
                 attrs={"rows": 2, "placeholder": "Ghi chú thêm (nếu có)"}
             ),
         }
+
+
+class TeacherQuickIncidentReportForm(forms.Form):
+    """
+    Báo cáo sự cố nhanh dạng text (giảng viên gửi tới CSVC).
+    """
+
+    message = forms.CharField(
+        widget=forms.Textarea(
+            attrs={
+                "rows": 4,
+                "placeholder": "Nhập nội dung báo cáo sự cố nhanh...",
+            }
+        ),
+        label="Nội dung báo cáo",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _apply_bootstrap(self)

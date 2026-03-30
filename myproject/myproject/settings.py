@@ -51,10 +51,25 @@ if os.name == 'nt':
             GDAL_LIBRARY_PATH = str(OSGEO_PATH / gdal_lib_name)
             GEOS_LIBRARY_PATH = str(OSGEO_PATH / 'geos_c.dll')
         else:
-            print("⚠️ GDAL Warning: Không tìm thấy file DLL gdalxxx.dll trong osgeo")
+            # Keep message ASCII-compatible to avoid UnicodeEncodeError in Windows console.
+            print("WARNING: GDAL Warning: Khong tim thay file DLL gdalxxx.dll trong osgeo")
     else:
         # Trường hợp máy đồng nghiệp chưa cài thư viện
-        print(f"⚠️ GDAL Warning: Chưa cài đặt thư viện GDAL tại {OSGEO_PATH}")
+        # Keep message ASCII-compatible to avoid UnicodeEncodeError in Windows console.
+        print(f"WARNING: GDAL Warning: Chua cai dat thu vien GDAL tai {OSGEO_PATH}")
+        # Fallback: locate GDAL/GEOS DLL from Anaconda (used by this project setup).
+        # This avoids failing Django GIS startup when `osgeo` python package isn't installed in venv.
+        try:
+            ANACONDA_PYOGRIO_LIBS = Path(r"C:\ProgramData\anaconda3\envs\seocntt3\Lib\site-packages\pyogrio.libs")
+            if ANACONDA_PYOGRIO_LIBS.exists():
+                gdal_dll = next(iter(ANACONDA_PYOGRIO_LIBS.glob("gdal-*.dll")), None)
+                geos_c_dll = next(iter(ANACONDA_PYOGRIO_LIBS.glob("geos_c-*.dll")), None)
+                if gdal_dll:
+                    GDAL_LIBRARY_PATH = str(gdal_dll)
+                if geos_c_dll:
+                    GEOS_LIBRARY_PATH = str(geos_c_dll)
+        except Exception:
+            pass
 
 
 
@@ -127,7 +142,7 @@ DATABASES = {
         'USER': 'postgres',
         'PASSWORD': '123',
         'HOST': 'localhost',
-        'PORT': '5432',
+        'PORT': '5433',
     }
 }
 
@@ -167,6 +182,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -175,6 +191,9 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Sau khi login thành công, tự động nhảy về trang chủ (name='home' trong urls.py)
 LOGIN_REDIRECT_URL = 'home' 
 
+# Django dùng biến này cho @login_required: khi chưa đăng nhập sẽ chuyển tới /login/
+LOGIN_URL = '/login/'
+
 # Sau khi logout, nhảy về trang login (hoặc trang chủ tùy bạn)
-LOGOUT_REDIRECT_URL = 'login'
+LOGOUT_REDIRECT_URL = 'home'
 

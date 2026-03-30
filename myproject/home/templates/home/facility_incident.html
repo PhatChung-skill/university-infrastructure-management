@@ -66,12 +66,19 @@
       <div class="collapse navbar-collapse" id="navbarCsvc">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0">
           <li class="nav-item">
+            <a class="nav-link" href="{% url 'home' %}">Trang chủ</a>
+          </li>
+          <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'facility_dashboard' %}active{% endif %}"
                href="{% url 'facility_dashboard' %}">Bảo trì tài sản</a>
           </li>
           <li class="nav-item">
             <a class="nav-link {% if request.resolver_match.url_name == 'facility_incident' %}active{% endif %}"
                aria-current="page" href="{% url 'facility_incident' %}">Báo cáo sự cố</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'facility_teacher_reports_history' %}active{% endif %}"
+               href="{% url 'facility_teacher_reports_history' %}">Lịch sử báo cáo nhanh</a>
           </li>
           <li class="nav-item">
             <a class="nav-link" href="{% url 'map_view' %}">Bản đồ</a>

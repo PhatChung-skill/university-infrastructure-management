@@ -7,3 +7,4 @@ from .equipment import *
 from .asset import *
 from .incident import *
 from .maintenance import *
+from .quick_incident_report import *

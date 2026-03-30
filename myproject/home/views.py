@@ -6,6 +6,9 @@ from django.contrib.auth import logout
 from django.urls import reverse
 from django.contrib import messages
 from django.http import JsonResponse
+from django.utils import timezone
+from django.db.models import Count, Sum
+from django.conf import settings
 
 from django.core.serializers import serialize
 from django.contrib.gis.geos import Point
@@ -15,6 +18,7 @@ from .forms import (
     BootstrapAuthenticationForm,
     FacilityMaintenanceForm,
     FacilityIncidentForm,
+    TeacherQuickIncidentReportForm,
 )
 from .models import (
     Building,
@@ -25,9 +29,11 @@ from .models import (
     Asset,
     Maintenance,
     Room,
+    QuickIncidentReport,
 )
 import json
 import unicodedata
+from datetime import datetime
 from typing import Optional
 
 
@@ -61,40 +67,163 @@ def _is_teacher_role(role_name: str) -> bool:
     return role_name in {"teacher", "giang vien", "giao vien"}
 
 
+def _room_blueprint_display_url(room: Room) -> str:
+    u = (room.blueprint_url or "").strip()
+    if not u:
+        return ""
+    if u.startswith(("http://", "https://")):
+        return u
+    if u.startswith("/"):
+        return u
+    return settings.MEDIA_URL.rstrip("/") + "/" + u.lstrip("/")
+
+
+def home(request):
+    """
+    Trang chủ (landing page) hiển thị trước đăng nhập và vẫn truy cập được sau đăng nhập.
+    """
+    buildings_count = Building.objects.count()
+    rooms_count = Room.objects.count()
+    equipment_count = Equipment.objects.count()
+    trees_count = Tree.objects.count()
+
+    app_user = None
+    role_name = ""
+    if request.user.is_authenticated:
+        app_user, role_name = _current_role_name(request)
+
+    # --- Tìm kiếm phòng học (GET ?q= & room_id=) ---
+    q_raw = (request.GET.get("q") or "").strip()
+    room_id_raw = request.GET.get("room_id")
+    searched_room = None
+    room_search_results = []
+    if room_id_raw:
+        try:
+            rid = int(room_id_raw)
+            searched_room = (
+                Room.objects.select_related("floor", "floor__building")
+                .filter(pk=rid)
+                .first()
+            )
+        except (TypeError, ValueError):
+            pass
+    if searched_room is None and q_raw:
+        qs = Room.objects.select_related("floor", "floor__building").filter(
+            name__icontains=q_raw
+        )[:30]
+        room_search_results = list(qs)
+        if len(room_search_results) == 1:
+            searched_room = room_search_results[0]
+
+    room_blueprint_url = ""
+    if searched_room:
+        room_blueprint_url = _room_blueprint_display_url(searched_room)
+
+    # --- Dữ liệu dashboard (bám database) ---
+    eq_total = Equipment.objects.count()
+    eq_good = Equipment.objects.filter(status="good").count()
+    eq_good_pct = round((eq_good / eq_total) * 100) if eq_total else 0
+
+    inc_open = Incident.objects.filter(status="open").count()
+    inc_processing = Incident.objects.filter(status="processing").count()
+    inc_high_open = Incident.objects.filter(status="open", priority="high").count()
+
+    now = timezone.now()
+    q_idx = (now.month - 1) // 3
+    start_month = q_idx * 3 + 1
+    quarter_start = timezone.make_aware(
+        datetime(now.year, start_month, 1, 0, 0, 0),
+        timezone.get_current_timezone(),
+    )
+    incidents_closed_quarter = Incident.objects.filter(
+        status="closed", reported_at__gte=quarter_start
+    ).count()
+
+    maintenance_recent = (
+        Maintenance.objects.select_related("asset", "staff")
+        .order_by("-maintenance_date")[:6]
+    )
+    incidents_recent = (
+        Incident.objects.select_related("incident_type", "asset")
+        .order_by("-reported_at")[:8]
+    )
+
+    room_by_type = list(
+        Room.objects.values("room_type").annotate(c=Count("id")).order_by("-c")
+    )
+    rmax = max((x["c"] for x in room_by_type), default=0)
+
+    room_type_labels = dict(Room.ROOM_TYPES)
+    room_type_chart = []
+    denom = rooms_count or 1
+    for row in room_by_type:
+        c = row["c"]
+        code = row["room_type"]
+        room_type_chart.append(
+            {
+                "code": code,
+                "label": room_type_labels.get(code, code),
+                "count": c,
+                "pct": round(100 * c / denom),
+            }
+        )
+
+    cost_agg = Maintenance.objects.aggregate(s=Sum("cost"))
+    maintenance_cost_total = cost_agg["s"] or 0
+
+    pending_total = inc_open + inc_processing
+    pending_bar_pct = min(100, 15 + pending_total * 12) if pending_total else 12
+    urgent_bar_pct = min(100, 10 + inc_high_open * 20) if inc_high_open else 8
+
+    context = {
+        "stats": {
+            "buildings": buildings_count,
+            "rooms": rooms_count,
+            "equipment": equipment_count,
+            "trees": trees_count,
+        },
+        "is_admin": bool(
+            request.user.is_authenticated
+            and (request.user.is_superuser or request.user.is_staff or _is_admin_role(role_name))
+        ),
+        "is_facility": bool(request.user.is_authenticated and app_user and _is_facility_role(role_name)),
+        "is_teacher": bool(request.user.is_authenticated and app_user and _is_teacher_role(role_name)),
+        "room_search_q": q_raw,
+        "searched_room": searched_room,
+        "room_search_results": room_search_results,
+        "room_blueprint_url": room_blueprint_url,
+        "eq_total": eq_total,
+        "eq_good_pct": eq_good_pct,
+        "inc_open": inc_open,
+        "inc_processing": inc_processing,
+        "inc_high_open": inc_high_open,
+        "incidents_closed_quarter": incidents_closed_quarter,
+        "maintenance_recent": maintenance_recent,
+        "incidents_recent": incidents_recent,
+        "room_by_type": room_by_type,
+        "room_by_type_max": rmax,
+        "room_type_chart": room_type_chart,
+        "maintenance_cost_total": maintenance_cost_total,
+        "pending_total": pending_total,
+        "pending_bar_pct": pending_bar_pct,
+        "urgent_bar_pct": urgent_bar_pct,
+    }
+    return render(request, "home/index.html", context)
+
+
 class Login(LoginView):
     template_name = 'login.html'
     authentication_form = BootstrapAuthenticationForm
 
     def get_success_url(self):
         """
-        Sau khi đăng nhập:
-        - Nếu là tài khoản admin (superuser/staff của Django) HOẶC user thuộc role 'Admin'
-          trong bảng AppUser/Role => chuyển sang trang Django Admin (dashboard)
-        - Nếu role là 'facility_staff' => chuyển sang trang dashboard nhân viên CSVC
-        - Nếu role là 'teacher' => chuyển sang dashboard giảng viên
-        - Ngược lại => chuyển sang trang bản đồ (map)
+        Sau khi đăng nhập: luôn giữ người dùng ở trang chủ.
+        Navbar/menu sẽ tự hiện các mục theo vai trò (role) để điều hướng sang trang khác.
         """
-        user = self.request.user
-        _, role_name = _current_role_name(self.request)
-
-        # 1. Ưu tiên tài khoản admin của Django (superuser / staff) → custom admin
-        if user.is_superuser or user.is_staff:
-            return reverse("admin_dashboard")
-
-        # 2. Hoặc người dùng có role trong bảng AppUser/Role
-        if role_name:
-            if _is_admin_role(role_name):
-                return reverse("admin_dashboard")
-            # Nhân viên CSVC: chấp nhận cả tên role tiếng Anh và tiếng Việt
-            if _is_facility_role(role_name):
-                return reverse("facility_dashboard")
-            # Giáo viên: chấp nhận cả 'teacher' và 'giảng viên'
-            if _is_teacher_role(role_name):
-                return reverse("teacher_dashboard")
-
-        return reverse("map_view")
+        return reverse("home")
 
 
+@login_required
 def map_view(request):
     # 1. Lấy dữ liệu và chuyển sang GeoJSON
     # Chúng ta lấy các trường cần thiết để hiển thị Popup (name, description, status...)
@@ -432,7 +561,7 @@ def facility_dashboard(request):
 
     # Chỉ cho phép role Nhân viên CSVC (tiếng Anh hoặc tiếng Việt)
     if not (app_user and _is_facility_role(role_name)):
-        return redirect("map_view")
+        return redirect("home")
 
     if request.method == "POST":
         form = FacilityMaintenanceForm(request.POST)
@@ -466,7 +595,7 @@ def facility_incident(request):
     app_user, role_name = _current_role_name(request)
 
     if not (app_user and _is_facility_role(role_name)):
-        return redirect("map_view")
+        return redirect("home")
 
     if request.method == "POST":
         form = FacilityIncidentForm(request.POST)
@@ -499,13 +628,48 @@ def facility_incident(request):
     return render(request, "home/facility_incident.html", context)
 
 
+@login_required
+def facility_teacher_reports_history(request):
+    """
+    CSVC xem lịch sử báo cáo sự cố nhanh (text) do giảng viên gửi.
+    - `mark_seen`: đánh dấu tin nhắn đã được CSVC xem (dùng chung cho toàn bộ CSVC).
+    - `delete`: xóa tin nhắn khỏi hệ thống.
+    """
+    app_user, role_name = _current_role_name(request)
+    if not (app_user and _is_facility_role(role_name)):
+        return redirect("home")
+
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        report_id = request.POST.get("report_id")
+        if action and report_id:
+            report = QuickIncidentReport.objects.filter(id=report_id).first()
+            if report:
+                if action == "mark_seen":
+                    report.is_seen = True
+                    report.seen_at = report.seen_at or timezone.now()
+                    report.save(update_fields=["is_seen", "seen_at"])
+                elif action == "delete":
+                    report.delete()
+
+        return redirect("facility_teacher_reports_history")
+
+    latest_report = QuickIncidentReport.objects.order_by("-created_at").first()
+    reports = QuickIncidentReport.objects.order_by("-created_at").all()
+
+    context = {
+        "reports": reports,
+        "latest_report": latest_report,
+    }
+    return render(request, "home/facility_teacher_reports_history.html", context)
+
+
 def logout_view(request):
     """
-    Đăng xuất khỏi hệ thống và luôn quay về trang login.
-    Dùng cho nút Đăng xuất trên giao diện Nhân viên CSVC.
+    Đăng xuất khỏi hệ thống và luôn quay về trang chủ.
     """
     logout(request)
-    return redirect("login")
+    return redirect("home")
 
 
 @login_required
@@ -518,7 +682,25 @@ def teacher_dashboard(request):
     app_user, role_name = _current_role_name(request)
 
     if not (app_user and _is_teacher_role(role_name)):
-        return redirect("map_view")
+        return redirect("home")
+
+    # Báo cáo sự cố nhanh dạng text (giảng viên gửi lên)
+    latest_quick_report = QuickIncidentReport.objects.order_by("-created_at").first()
+
+    if request.method == "POST":
+        form = TeacherQuickIncidentReportForm(request.POST)
+        if form.is_valid():
+            message = form.cleaned_data["message"].strip()
+            if message:
+                QuickIncidentReport.objects.create(
+                    sender=app_user,
+                    message=message,
+                    is_seen=False,
+                )
+                messages.success(request, "Đã gửi báo cáo sự cố nhanh đến CSVC.")
+            return redirect("teacher_dashboard")
+    else:
+        form = TeacherQuickIncidentReportForm()
 
     # Lấy danh sách phòng + thiết bị để tính trạng thái
     rooms = Room.objects.select_related("floor", "floor__building").prefetch_related("equipment_set").all()
@@ -549,5 +731,7 @@ def teacher_dashboard(request):
 
     context = {
         "room_status_list": room_status_list,
+        "teacher_quick_report_form": form,
+        "latest_quick_report": latest_quick_report,
     }
     return render(request, "home/teacher_dashboard.html", context)
