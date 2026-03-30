@@ -409,7 +409,10 @@
         </div>
         <div class="col-12 col-lg-7">
           <div class="video-wrap">
-            <iframe src="https://www.youtube.com/embed/TRwGl96wVcg" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+            <video controls playsinline poster="{% static 'img/tnmt.jpg' %}">
+              <source src="{% static 'videos/tnmt.mp4' %}" type="video/mp4">
+              Trình duyệt không hỗ trợ video HTML5.
+            </video>
           </div>
           <p class="small text-muted mt-2 mb-0">
               Hình ảnh và video minh họa môi trường học tập tại trường, thể hiện cam kết phát triển bền vững và hiện đại hóa cơ sở vật chất.
