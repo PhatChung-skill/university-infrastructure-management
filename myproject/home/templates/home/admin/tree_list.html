@@ -2,6 +2,21 @@
 
 {% block title %}Quản lý cây xanh{% endblock %}
 
+{% block extra_head %}
+<style>
+  .inline-detail-row td {
+    background: #f8fbf8;
+    border-top: 0;
+  }
+  .inline-detail-box {
+    border-left: 3px solid #43a047;
+    padding: .6rem .8rem;
+    font-size: .92rem;
+    color: #2f3b2f;
+  }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
   <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> / Cây xanh
 {% endblock %}
@@ -13,7 +28,10 @@
       <h5 class="mb-0">Cây xanh</h5>
       <small class="d-block mt-1">Chọn mã cây hoặc nút Sửa để thay đổi dữ liệu. Có tọa độ sẽ hiển thị trên bản đồ.</small>
     </div>
-    <a href="{% url 'admin_tree_add' %}" class="btn btn-light btn-sm">+ Thêm cây</a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'admin_excel_import' %}?table=tree" class="btn btn-light btn-sm text-dark">Nhập Excel</a>
+      <a href="{% url 'admin_tree_add' %}" class="btn btn-light btn-sm">+ Thêm cây</a>
+    </div>
   </div>
   <div class="card-body">
     {% if page_obj %}<p class="text-muted small mb-2">Tổng: {{ page_obj.paginator.count }} cây. Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}.</p>{% endif %}
@@ -59,6 +77,7 @@
             <th>Loài</th>
             <th>Tình trạng</th>
             <th>Ngày trồng</th>
+            <th>Chi nhánh</th>
             <th>Vị trí</th>
             <th class="text-end">Thao tác</th>
           </tr>
@@ -71,6 +90,7 @@
             <td>{{ t.species }}</td>
             <td>{{ t.get_health_status_display }}</td>
             <td>{{ t.planted_date|date:"d/m/Y"|default:"-" }}</td>
+            <td>{{ t.university_branch|default:"-" }}</td>
             <td>
               {% if t.geom %}
                 <span class="badge bg-success">Có tọa độ</span>
@@ -79,13 +99,23 @@
               {% endif %}
             </td>
             <td class="text-end" onclick="event.stopPropagation();">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle-detail="tree-{{ t.pk }}">Xem</button>
               <a href="{% url 'admin_tree_edit' t.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
               <a href="{% url 'admin_tree_delete' t.pk %}" class="btn btn-outline-danger btn-sm">Xóa</a>
             </td>
           </tr>
+          <tr id="tree-{{ t.pk }}" class="inline-detail-row d-none">
+            <td></td>
+            <td colspan="7">
+              <div class="inline-detail-box">
+                <div><strong>Chiều cao:</strong> {{ t.height|default:"" }}</div>
+                <div><strong>Ghi chú:</strong> {{ t.note|default:"" }}</div>
+              </div>
+            </td>
+          </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="text-center text-muted">Chưa có cây nào. Nhấn «Thêm cây» để tạo mới.</td>
+            <td colspan="8" class="text-center text-muted">Chưa có cây nào. Nhấn «Thêm cây» để tạo mới.</td>
           </tr>
           {% endfor %}
         </tbody>
@@ -107,4 +137,21 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-toggle-detail]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var id = btn.getAttribute('data-toggle-detail');
+        var row = document.getElementById(id);
+        if (!row) return;
+        row.classList.toggle('d-none');
+      });
+    });
+  });
+</script>
 {% endblock %}

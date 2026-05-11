@@ -1,20 +1,28 @@
 from django.contrib.gis.db import models
+from django.core.validators import MinValueValidator
+
 
 class Tree(models.Model):
     HEALTH_STATUS = [
-        ("good", "Tốt"),
-        ("diseased", "Bệnh"),
-        ("dangerous", "Nguy hiểm"),
+        ("good", "Good"),
+        ("diseased", "Diseased"),
+        ("dangerous", "Dangerous"),
     ]
+    code = models.TextField(unique=True)
+    species = models.TextField(blank=True, null=True)
+    height = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, validators=[MinValueValidator(0)])
+    health_status = models.CharField(max_length=20, choices=HEALTH_STATUS, blank=True, null=True)
+    planted_date = models.DateField(blank=True, null=True)
+    last_trimmed = models.DateField(blank=True, null=True)
+    note = models.TextField(blank=True, null=True)
+    university_branch = models.ForeignKey("UniversityBranch", on_delete=models.SET_NULL, null=True, blank=True, related_name="trees")
+    geom = models.PointField(srid=4326, blank=True, null=True)
 
-    code = models.CharField(max_length=50, unique=True)
-    species = models.TextField(null=True, blank=True)
-    height = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
-    health_status = models.CharField(max_length=20, choices=HEALTH_STATUS, null=True, blank=True)
-    planted_date = models.DateField(null=True, blank=True)
-    last_trimmed = models.DateField(null=True, blank=True)
-    note = models.TextField(null=True, blank=True)
-    geom = models.PointField(srid=4326)
+    class Meta:
+        db_table = "tree"
+        indexes = [
+            models.Index(fields=["geom"], name="idx_tree_geom"),
+        ]
 
     def __str__(self):
         return self.code

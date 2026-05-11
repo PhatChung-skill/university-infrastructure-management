@@ -70,6 +70,34 @@
       border: 1px solid rgba(27,94,32,.25);
     }
     .search-bar .btn{ border-radius: 12px; }
+    .search-bar .btn-search-icon{
+      min-width: 3.25rem;
+      border-top-right-radius: 12px !important;
+      border-bottom-right-radius: 12px !important;
+    }
+    .search-bar .btn-search-icon svg{ display: block; }
+    .pagination-home .page-link{
+      color: var(--brand-dark);
+      border-color: rgba(46,125,50,.35);
+      background:#fff;
+      min-width: 2.25rem;
+      text-align:center;
+      border-radius: 8px;
+      padding: 0.35rem 0.5rem;
+    }
+    .pagination-home .page-item + .page-item{ margin-left: .25rem; }
+    .pagination-home .page-item:not(.disabled) .page-link:hover{
+      color:#fff;
+      background: linear-gradient(135deg, var(--brand), var(--accent));
+      border-color: var(--brand);
+    }
+    .pagination-home .page-item.disabled .page-link{
+      color:#94a3b8;
+      background: rgba(232,245,233,.5);
+      border-color: rgba(46,125,50,.12);
+      opacity:.7;
+      cursor: not-allowed;
+    }
     .stat-card{
       background: var(--card);
       border: 1px solid var(--border);
@@ -83,6 +111,41 @@
     .stat-card.c2{ border-bottom-color:#d97706; }
     .stat-card.c3{ border-bottom-color:#2563eb; }
     .stat-card.c4{ border-bottom-color:#dc2626; }
+    .stat-card.c5{ border-bottom-color:#7c3aed; }
+    .stats-scroll{
+      display: flex;
+      gap: 12px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 4px 2px 10px;
+      scrollbar-width: thin;
+      cursor: grab;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    .stats-scroll.dragging{ cursor: grabbing; }
+    .stats-scroll > .stat-item{
+      flex: 0 0 clamp(220px, 24vw, 290px);
+      min-width: 220px;
+    }
+    .hero-stats-wrap{
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 12px;
+      padding: 4px 2px 10px;
+      align-content: start;
+    }
+    .hero-stats-wrap > .stat-item{
+      min-width: 0;
+    }
+    @media (max-width: 575.98px){
+      .hero-stats-wrap{
+        grid-template-columns: 1fr;
+      }
+      .hero-stats-wrap > .stat-item{
+        min-width: 0;
+      }
+    }
     .stat-number{ font-weight: 900; font-size: 1.75rem; letter-spacing: -0.3px; color: var(--brand-dark); }
     .stat-label{ color: var(--muted); font-weight: 600; font-size: .9rem; }
     .mini-bar{
@@ -199,7 +262,7 @@
         <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
           <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Trang chủ</a></li>
           <li class="nav-item"><a class="nav-link" href="#tinh-nang">Tính năng</a></li>
-          <li class="nav-item"><a class="nav-link" href="#gioi-thieu">Giới thiệu</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'about_school' %}">Giới thiệu</a></li>
           <li class="nav-item"><a class="nav-link" href="#tong-quan">Tổng quan</a></li>
 
           {% if user.is_authenticated %}
@@ -208,7 +271,7 @@
               <li class="nav-item"><a class="nav-link" href="{% url 'admin_dashboard' %}">Quản trị</a></li>
             {% endif %}
             {% if is_facility %}
-              <li class="nav-item"><a class="nav-link" href="{% url 'facility_dashboard' %}">CSVC</a></li>
+              <li class="nav-item"><a class="nav-link" href="{% url 'facility_dashboard' %}">Nhân viên CSVC</a></li>
             {% endif %}
             {% if is_teacher %}
               <li class="nav-item"><a class="nav-link" href="{% url 'teacher_dashboard' %}">Giảng viên</a></li>
@@ -246,7 +309,11 @@
                 <input type="search" name="q" value="{{ room_search_q }}"
                        class="form-control" placeholder="Nhập tên phòng (ví dụ: B204, Lab A1...)"
                        autocomplete="off">
-                <button class="btn btn-brand px-4" type="submit">Tìm</button>
+                <button class="btn btn-brand btn-search-icon d-flex align-items-center justify-content-center px-3" type="submit" aria-label="Tìm phòng">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                  </svg>
+                </button>
               </div>
               <div class="form-text">Chỉ tìm theo <strong>phòng học</strong> trong cơ sở dữ liệu.</div>
             </form>
@@ -281,11 +348,16 @@
                     <p class="text-muted small mt-3 mb-0">Chưa có hình sơ đồ phòng trong hệ thống.</p>
                   {% endif %}
                 </div>
-              {% elif room_search_results %}
-                <div class="mt-3">
-                  <div class="fw-semibold mb-2">Có {{ room_search_results|length }} kết quả — chọn một phòng:</div>
+              {% elif room_search_page %}
+                <div id="home-room-search-panel" class="mt-3">
+                  <div class="fw-semibold mb-2">
+                    Có {{ room_search_page.paginator.count }} kết quả — chọn một phòng
+                    {% if room_search_page.paginator.num_pages > 1 %}
+                      <span class="text-muted fw-normal">(tối đa {{ room_search_page.paginator.per_page }} / trang)</span>
+                    {% endif %}
+                  </div>
                   <div class="list-group">
-                    {% for r in room_search_results %}
+                    {% for r in room_search_page %}
                       <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
                          href="{% url 'home' %}?q={{ room_search_q|urlencode }}&amp;room_id={{ r.id }}">
                         <span>
@@ -296,6 +368,40 @@
                       </a>
                     {% endfor %}
                   </div>
+                  {% if room_search_page.paginator.num_pages > 1 %}
+                    <nav id="home-room-pagination" class="mt-3 d-flex justify-content-start" aria-label="Phân trang kết quả tìm phòng">
+                      <ul class="pagination pagination-home pagination-sm mb-0">
+                        <li class="page-item{% if not room_search_page.has_previous %} disabled{% endif %}">
+                          {% if room_search_page.has_previous %}
+                            <a class="page-link" href="{% url 'home' %}?q={{ room_search_q|urlencode }}&amp;page=1" title="Trang đầu" aria-label="Trang đầu">«</a>
+                          {% else %}
+                            <span class="page-link" aria-disabled="true">«</span>
+                          {% endif %}
+                        </li>
+                        <li class="page-item{% if not room_search_page.has_previous %} disabled{% endif %}">
+                          {% if room_search_page.has_previous %}
+                            <a class="page-link" href="{% url 'home' %}?q={{ room_search_q|urlencode }}&amp;page={{ room_search_page.previous_page_number }}" title="Trang trước" aria-label="Trang trước">‹</a>
+                          {% else %}
+                            <span class="page-link" aria-disabled="true">‹</span>
+                          {% endif %}
+                        </li>
+                        <li class="page-item{% if not room_search_page.has_next %} disabled{% endif %}">
+                          {% if room_search_page.has_next %}
+                            <a class="page-link" href="{% url 'home' %}?q={{ room_search_q|urlencode }}&amp;page={{ room_search_page.next_page_number }}" title="Trang sau" aria-label="Trang sau">›</a>
+                          {% else %}
+                            <span class="page-link" aria-disabled="true">›</span>
+                          {% endif %}
+                        </li>
+                        <li class="page-item{% if not room_search_page.has_next %} disabled{% endif %}">
+                          {% if room_search_page.has_next %}
+                            <a class="page-link" href="{% url 'home' %}?q={{ room_search_q|urlencode }}&amp;page={{ room_search_page.paginator.num_pages }}" title="Trang cuối" aria-label="Trang cuối">»</a>
+                          {% else %}
+                            <span class="page-link" aria-disabled="true">»</span>
+                          {% endif %}
+                        </li>
+                      </ul>
+                    </nav>
+                  {% endif %}
                   <a class="btn btn-link btn-sm px-0 mt-2" href="{% url 'home' %}">Xóa tìm kiếm</a>
                 </div>
               {% elif room_search_q %}
@@ -315,27 +421,33 @@
         </div>
 
         <div class="col-12 col-lg-5">
-          <div class="row g-3">
-            <div class="col-6">
+          <div class="hero-stats-wrap">
+            <div class="stat-item">
+              <div class="stat-card c2">
+                <div class="stat-number">{{ stats.branches }}</div>
+                <div class="stat-label">Chi nhánh / cơ sở</div>
+              </div>
+            </div>
+            <div class="stat-item">
               <div class="stat-card c1">
                 <div class="stat-number">{{ stats.buildings }}</div>
                 <div class="stat-label">Tòa nhà</div>
               </div>
             </div>
-            <div class="col-6">
-              <div class="stat-card c1">
+            <div class="stat-item">
+              <div class="stat-card c4">
                 <div class="stat-number">{{ stats.rooms }}</div>
                 <div class="stat-label">Phòng học / chức năng</div>
               </div>
             </div>
-            <div class="col-6">
+            <div class="stat-item">
               <div class="stat-card c3">
                 <div class="stat-number">{{ stats.equipment }}</div>
                 <div class="stat-label">Thiết bị</div>
               </div>
             </div>
-            <div class="col-6">
-              <div class="stat-card c1">
+            <div class="stat-item">
+              <div class="stat-card c5">
                 <div class="stat-number">{{ stats.trees }}</div>
                 <div class="stat-label">Cây xanh</div>
               </div>
@@ -400,7 +512,7 @@
               {% if is_admin %}
                 <a class="btn btn-outline-brand" href="{% url 'admin_dashboard' %}">Quản trị</a>
               {% elif is_facility %}
-                <a class="btn btn-outline-brand" href="{% url 'facility_dashboard' %}">CSVC</a>
+                <a class="btn btn-outline-brand" href="{% url 'facility_dashboard' %}">Nhân viên CSVC</a>
               {% elif is_teacher %}
                 <a class="btn btn-outline-brand" href="{% url 'teacher_dashboard' %}">Giảng viên</a>
               {% endif %}
@@ -428,8 +540,19 @@
       <h2 class="section-title">Tình trạng cơ sở vật chất</h2>
       <div class="section-sub">Số liệu cập nhật trực tiếp từ cơ sở dữ liệu hệ thống.</div>
 
-      <div class="row g-3 mb-5">
-        <div class="col-12 col-md-6 col-xl-3">
+      <div class="stats-scroll drag-scroll mb-5">
+        <div class="stat-item">
+          <div class="stat-card c5">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <span class="stat-label">Chi nhánh / cơ sở</span>
+              <span class="rounded-3 p-2" style="background: #f5f3ff; font-size: 1.1rem;">🏫</span>
+            </div>
+            <div class="stat-number">{{ stats.branches }}</div>
+            <div class="mini-bar mt-2"><span style="width: 88%; background: #7c3aed;"></span></div>
+            <div class="small text-muted mt-2">Tổng số cơ sở đang được quản lý.</div>
+          </div>
+        </div>
+        <div class="stat-item">
           <div class="stat-card c1">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <span class="stat-label">Công trình / tòa nhà</span>
@@ -440,7 +563,7 @@
             <div class="small text-muted mt-2">Tổng số tòa được quản lý trên bản đồ.</div>
           </div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
+        <div class="stat-item">
           <div class="stat-card c2">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <span class="stat-label">Yêu cầu / sự cố chờ xử lý</span>
@@ -451,7 +574,7 @@
             <div class="small text-muted mt-2">Mở: {{ inc_open }} · Đang xử lý: {{ inc_processing }}</div>
           </div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
+        <div class="stat-item">
           <div class="stat-card c3">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <span class="stat-label">Thiết bị (trạng thái tốt)</span>
@@ -462,7 +585,7 @@
             <div class="small text-muted mt-2">{{ eq_good_pct }}% thiết bị đang ở trạng thái “Tốt”.</div>
           </div>
         </div>
-        <div class="col-12 col-md-6 col-xl-3">
+        <div class="stat-item">
           <div class="stat-card c4">
             <div class="d-flex justify-content-between align-items-start mb-2">
               <span class="stat-label">Sự cố ưu tiên cao (mở)</span>
@@ -612,10 +735,10 @@
         <div class="col-12 col-lg-3">
           <div class="fw-bold mb-2">Liên hệ</div>
           <ul class="list-unstyled small" style="color: rgba(232,245,233,.9);">
-            <li class="mb-2">📍 236B Lê Văn Sỹ, Phường Tân Sơn Hòa, TP. Hồ Chí Minh</li>
-            <li class="mb-2">📞  0379159999</li>
-            <li class="mb-2">✉️ <a href="mailto:nguyenthientan2305@gmail.com">nguyenthientan2305@gmail.com</a></li>
-            <li>🌐 <a href="https://hcmunre.edu.vn/" target="_blank" rel="noopener">hcmunre.edu.vn</a></li>
+            <li class="mb-2">📍 123 Đường Giáo Dục, Q.1, TP.HCM</li>
+            <li class="mb-2">📞 (028) 3822 xxxx</li>
+            <li class="mb-2">✉️ <a href="mailto:csvc@thptquocgia.edu.vn">csvc@thptquocgia.edu.vn</a></li>
+            <li>🌐 <a href="https://thptquocgia.edu.vn" target="_blank" rel="noopener">thptquocgia.edu.vn</a></li>
           </ul>
         </div>
       </div>
@@ -627,5 +750,85 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      document.querySelectorAll('.drag-scroll').forEach(function (el) {
+        let isDown = false;
+        let startX = 0;
+        let scrollLeft = 0;
+
+        el.addEventListener('mousedown', function (e) {
+          isDown = true;
+          el.classList.add('dragging');
+          startX = e.pageX - el.offsetLeft;
+          scrollLeft = el.scrollLeft;
+        });
+
+        el.addEventListener('mouseleave', function () {
+          isDown = false;
+          el.classList.remove('dragging');
+        });
+
+        el.addEventListener('mouseup', function () {
+          isDown = false;
+          el.classList.remove('dragging');
+        });
+
+        el.addEventListener('mousemove', function (e) {
+          if (!isDown) return;
+          e.preventDefault();
+          const x = e.pageX - el.offsetLeft;
+          const walk = (x - startX) * 1.2;
+          el.scrollLeft = scrollLeft - walk;
+        });
+      });
+
+      function swapFragmentByFetch(url, rootId) {
+        return fetch(url, {
+          credentials: 'same-origin',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        }).then(function (res) {
+          if (!res.ok) throw new Error('fetch failed');
+          return res.text();
+        }).then(function (html) {
+          var doc = new DOMParser().parseFromString(html, 'text/html');
+          var next = doc.getElementById(rootId);
+          var cur = document.getElementById(rootId);
+          if (!next || !cur) throw new Error('missing root');
+          cur.innerHTML = next.innerHTML;
+        });
+      }
+
+      document.addEventListener('click', function (e) {
+        var nav = e.target.closest('#home-room-pagination');
+        if (!nav) return;
+        var a = e.target.closest('a.page-link');
+        if (!a || !a.href) return;
+        e.preventDefault();
+        var url = a.href;
+        swapFragmentByFetch(url, 'home-room-search-panel').then(function () {
+          try {
+            history.pushState({ homeRoomSearchAjax: true }, '', url);
+          } catch (err) {}
+        }).catch(function () {
+          window.location.href = url;
+        });
+      });
+
+      window.addEventListener('popstate', function () {
+        var params = new URLSearchParams(window.location.search);
+        if (!params.get('q')) {
+          if (document.getElementById('home-room-search-panel')) {
+            window.location.reload();
+          }
+          return;
+        }
+        if (!document.getElementById('home-room-search-panel')) return;
+        swapFragmentByFetch(window.location.pathname + window.location.search, 'home-room-search-panel').catch(function () {
+          window.location.reload();
+        });
+      });
+    });
+  </script>
 </body>
 </html>

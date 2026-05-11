@@ -11,15 +11,18 @@
   <div class="card-admin-header d-flex justify-content-between align-items-center flex-wrap gap-2">
     <div>
       <h5 class="mb-0">Thiết bị</h5>
-      <small class="d-block mt-1">Chọn mã hoặc nút Sửa để thay đổi. Có tọa độ sẽ hiển thị trên bản đồ.</small>
+      <small class="d-block mt-1">GPS khuôn viên + tọa độ trên sơ đồ phòng (nếu có) dùng chung với bản đồ công khai.</small>
     </div>
-    <a href="{% url 'admin_equipment_add' %}" class="btn btn-light btn-sm">+ Thêm thiết bị</a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'admin_excel_import' %}?table=equipment" class="btn btn-light btn-sm text-dark">Nhập Excel</a>
+      <a href="{% url 'admin_equipment_add' %}" class="btn btn-light btn-sm">+ Thêm thiết bị</a>
+    </div>
   </div>
   <div class="card-body">
     {% if page_obj %}<p class="text-muted small mb-2">Tổng: {{ page_obj.paginator.count }} thiết bị. Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}.</p>{% endif %}
     <form method="get" class="row g-2 mb-3">
       <div class="col-md-6">
-        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo mã, tên, loại hoặc phòng...">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo mã, tên, loại, cơ sở, tòa, tầng, phòng...">
       </div>
       <div class="col-md-4">
         <select name="status" class="form-select">
@@ -56,6 +59,9 @@
             <th>Tên</th>
             <th>Loại</th>
             <th>Trạng thái</th>
+            <th>Cơ sở</th>
+            <th>Tòa nhà</th>
+            <th>Tầng</th>
             <th>Phòng</th>
             <th>Vị trí</th>
             <th class="text-end">Thao tác</th>
@@ -69,9 +75,15 @@
             <td>{{ eq.name }}</td>
             <td>{{ eq.equipment_type }}</td>
             <td>{{ eq.get_status_display }}</td>
+            <td>{{ eq.room.floor.building.university_branch.name|default:"-" }}</td>
+            <td>{{ eq.room.floor.building.name|default:"-" }}</td>
+            <td>{{ eq.room.floor.name|default:"-" }}</td>
             <td>{{ eq.room|default:"-" }}</td>
             <td>
-              {% if eq.geom %}<span class="badge bg-success">Có tọa độ</span>{% else %}<span class="badge bg-secondary">Chưa có</span>{% endif %}
+              {% if eq.geom %}<span class="badge bg-success">GPS</span>{% else %}<span class="badge bg-secondary">Chưa GPS</span>{% endif %}
+              {% if eq.local_x is not None and eq.local_y is not None %}
+              <span class="badge bg-info text-dark ms-1" title="Tọa độ trên sơ đồ phòng">Sơ đồ</span>
+              {% endif %}
             </td>
             <td class="text-end" onclick="event.stopPropagation();">
               <a href="{% url 'admin_equipment_edit' eq.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
@@ -79,7 +91,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="8" class="text-center text-muted">Chưa có thiết bị nào. Nhấn «Thêm thiết bị» để tạo mới.</td></tr>
+          <tr><td colspan="11" class="text-center text-muted">Chưa có thiết bị nào. Nhấn «Thêm thiết bị» để tạo mới.</td></tr>
           {% endfor %}
         </tbody>
       </table>

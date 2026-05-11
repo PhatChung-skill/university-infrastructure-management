@@ -1,0 +1,106 @@
+/* Trang quên mật khẩu / đặt lại mật khẩu — tách khỏi giao diện Django admin */
+.auth-flow-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.auth-topbar {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid rgba(46, 125, 50, 0.12);
+  box-shadow: 0 4px 24px rgba(27, 94, 32, 0.06);
+}
+
+.auth-brand-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #e8f5e9, #c8e6c9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #2e7d32;
+  font-size: 1.35rem;
+}
+
+.auth-card {
+  border: none;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(27, 94, 32, 0.12);
+}
+
+.auth-card .card-body {
+  padding: 2rem 1.75rem;
+}
+
+@media (min-width: 576px) {
+  .auth-card .card-body {
+    padding: 2.25rem 2rem;
+  }
+}
+
+.auth-card-head {
+  text-align: center;
+  margin-bottom: 1.25rem;
+}
+
+.auth-card-head h1 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: #1b5e20;
+  margin-bottom: 0.35rem;
+}
+
+.auth-illus {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1rem;
+  border-radius: 50%;
+  background: linear-gradient(160deg, #e8f5e9, #a5d6a7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1b5e20;
+  font-size: 2rem;
+}
+
+/* Hai nút header: cùng kích thước / padding / font (chỉ khác màu) */
+.auth-nav-pair .btn-auth-pill {
+  min-width: 9.25rem;
+  padding: 0.45rem 1.1rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  border-radius: 999px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.btn-auth-pill-outline {
+  border: 1px solid rgba(46, 125, 50, 0.45);
+  color: #1b5e20;
+  background: #fff;
+}
+
+.btn-auth-pill-outline:hover {
+  background: #f1f8f4;
+  border-color: #2e7d32;
+  color: #1b5e20;
+}
+
+.btn-auth-pill-primary {
+  background: linear-gradient(135deg, #2e7d32, #43a047);
+  border: 1px solid #2e7d32;
+  color: #fff;
+}
+
+.btn-auth-pill-primary:hover {
+  background: linear-gradient(135deg, #1b5e20, #2e7d32);
+  color: #fff;
+}
+
+.letter-spacing-code {
+  letter-spacing: 0.35em;
+  font-variant-numeric: tabular-nums;
+}

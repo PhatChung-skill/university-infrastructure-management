@@ -1,0 +1,32 @@
+{% extends "home/admin_base.html" %}
+
+{% block title %}Quản lý trang giới thiệu{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="{% url 'admin_about_manage' %}">Quản lý trang giới thiệu</a>
+{% endblock %}
+
+{% block content %}
+<div class="card card-admin mb-4">
+  <div class="card-admin-header">
+    <h5 class="mb-0">Quản lý trang giới thiệu</h5>
+    <small class="d-block mt-1">Khu quản lý riêng, chỉ gồm đúng 3 nhóm nội dung.</small>
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <a href="{% url 'admin_about_hero_list' %}" class="btn btn-outline-success w-100 py-3">Banner & Lời ngỏ</a>
+      </div>
+      <div class="col-md-3">
+        <a href="{% url 'admin_about_core_value_list' %}" class="btn btn-outline-success w-100 py-3">Hiện đại & Công nghệ</a>
+      </div>
+      <div class="col-md-3">
+        <a href="{% url 'admin_about_announcement_list' %}" class="btn btn-outline-success w-100 py-3">Thông báo & Tin tức</a>
+      </div>
+      <div class="col-md-3">
+        <a href="{% url 'admin_about_event_list' %}" class="btn btn-outline-success w-100 py-3">Sự kiện nổi bật</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

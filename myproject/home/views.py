@@ -1,27 +1,34 @@
-from django.shortcuts import render, redirect
+from django.core.paginator import Paginator
+from django.shortcuts import get_object_or_404, render, redirect
 from django.views import View
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth import logout
+from django.contrib.auth import logout, update_session_auth_hash
 from django.urls import reverse
+from django.conf import settings
 from django.contrib import messages
 from django.http import JsonResponse
 from django.utils import timezone
-from django.db.models import Count, Sum
-from django.conf import settings
-
+from django.db.models import Count, Sum, Q
 from django.core.serializers import serialize
 from django.contrib.gis.geos import Point
 from django.contrib.gis.measure import D
+from django.db.utils import OperationalError, ProgrammingError
 
 from .forms import (
     BootstrapAuthenticationForm,
+    ForgotPasswordEmailForm,
+    VerifySixDigitForm,
+    BootstrapSetPasswordForm,
+    BootstrapPasswordChangeForm,
     FacilityMaintenanceForm,
     FacilityIncidentForm,
     TeacherQuickIncidentReportForm,
 )
 from .models import (
+    UniversityBranch,
     Building,
+    Floor,
     Tree,
     Incident,
     Equipment,
@@ -30,18 +37,81 @@ from .models import (
     Maintenance,
     Room,
     QuickIncidentReport,
+    IncidentType,
+    PasswordResetCode,
+    AboutHeroSection,
+    AboutCoreValue,
+    AboutAnnouncement,
+    AboutFeaturedEvent,
+)
+from .password_reset_utils import (
+    generate_six_digit_code,
+    hash_reset_code,
+    send_password_reset_code_email,
+)
+from .map_utils import (
+    buildings_geojson_dumps,
+    floor_equipment_map_payload,
+    floor_rooms_geojson,
+    floors_payload_for_building,
+    room_blueprint_display_url,
+    room_layout_payload,
 )
 import json
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
+from urllib.parse import urlencode
+
+# Số dòng cố định mỗi trang trên dashboard giảng viên (bảng phòng + dòng trống pad).
+TEACHER_ROOMS_PER_PAGE = 10
+# Tìm phòng trên trang chủ — số kết quả mỗi trang (phân trang + fetch, không reload).
+HOME_ROOM_SEARCH_PER_PAGE = 10
+
+
+def _teacher_room_status_search_blob(item: dict) -> str:
+    """Chuỗi tìm kiếm thô: tòa, tầng, phòng, loại phòng, tình trạng (VN + mã), thiết bị."""
+    room = item["room"]
+    fl = room.floor
+    bld = fl.building if fl else None
+    parts = [
+        room.name or "",
+        (fl.name if fl else "") or "",
+        (bld.name if bld else "") or "",
+        room.get_room_type_display() or "",
+        (room.room_type or ""),
+        item.get("status_label") or "",
+    ]
+    for eq in room.equipment_set.all():
+        parts.extend(
+            [
+                eq.code or "",
+                eq.name or "",
+                eq.equipment_type or "",
+                eq.status or "",
+            ]
+        )
+    return " ".join(parts).lower()
+
+
+def _teacher_room_status_matches(item: dict, query: str) -> bool:
+    q = (query or "").strip().lower()
+    if not q:
+        return True
+    blob = _teacher_room_status_search_blob(item)
+    for token in q.split():
+        t = token.strip()
+        if t and t not in blob:
+            return False
+    return True
 
 
 def _normalize_role_name(name: Optional[str]) -> str:
     if not name:
         return ""
     normalized = unicodedata.normalize("NFD", name).encode("ascii", "ignore").decode("ascii")
-    return normalized.strip().lower()
+    normalized = normalized.strip().lower().replace("_", " ")
+    return " ".join(normalized.split())
 
 
 def _current_role_name(request):
@@ -55,7 +125,7 @@ def _is_admin_role(role_name: str) -> bool:
 
 def _is_facility_role(role_name: str) -> bool:
     return role_name in {
-        "facility_staff",
+        "facility staff",
         "nhan vien csvc",
         "nhan vien co so vat chat",
         "csvc",
@@ -63,25 +133,39 @@ def _is_facility_role(role_name: str) -> bool:
     }
 
 
+def _is_technical_staff_role(role_name: str) -> bool:
+    """Nhân viên kỹ thuật / bảo trì — cùng khu chức năng phiếu bảo trì & báo cáo sự cố với CSVC."""
+    return role_name in {
+        "ky thuat",
+        "nhan vien ky thuat",
+        "ky thuat vien",
+        "technical",
+        "technician",
+        "maintenance technician",
+    }
+
+
+def _is_facility_or_technical_staff(role_name: str) -> bool:
+    return _is_facility_role(role_name) or _is_technical_staff_role(role_name)
+
+
 def _is_teacher_role(role_name: str) -> bool:
-    return role_name in {"teacher", "giang vien", "giao vien"}
+    return role_name in {"teacher", "giang vien", "giao vien", "lecturer"}
 
 
-def _room_blueprint_display_url(room: Room) -> str:
-    u = (room.blueprint_url or "").strip()
-    if not u:
-        return ""
-    if u.startswith(("http://", "https://")):
-        return u
-    if u.startswith("/"):
-        return u
-    return settings.MEDIA_URL.rstrip("/") + "/" + u.lstrip("/")
+def _requires_password_change(app_user, role_name: str) -> bool:
+    return bool(
+        app_user
+        and app_user.must_change_password
+        and (_is_facility_or_technical_staff(role_name) or _is_teacher_role(role_name))
+    )
 
 
 def home(request):
     """
     Trang chủ (landing page) hiển thị trước đăng nhập và vẫn truy cập được sau đăng nhập.
     """
+    branches_count = UniversityBranch.objects.count()
     buildings_count = Building.objects.count()
     rooms_count = Room.objects.count()
     equipment_count = Equipment.objects.count()
@@ -96,7 +180,7 @@ def home(request):
     q_raw = (request.GET.get("q") or "").strip()
     room_id_raw = request.GET.get("room_id")
     searched_room = None
-    room_search_results = []
+    room_search_page = None
     if room_id_raw:
         try:
             rid = int(room_id_raw)
@@ -108,16 +192,21 @@ def home(request):
         except (TypeError, ValueError):
             pass
     if searched_room is None and q_raw:
-        qs = Room.objects.select_related("floor", "floor__building").filter(
-            name__icontains=q_raw
-        )[:30]
-        room_search_results = list(qs)
-        if len(room_search_results) == 1:
-            searched_room = room_search_results[0]
+        base_qs = (
+            Room.objects.select_related("floor", "floor__building")
+            .filter(name__icontains=q_raw)
+            .order_by("name")
+        )
+        total_matches = base_qs.count()
+        if total_matches == 1:
+            searched_room = base_qs.first()
+        elif total_matches > 1:
+            paginator = Paginator(base_qs, HOME_ROOM_SEARCH_PER_PAGE)
+            room_search_page = paginator.get_page(request.GET.get("page"))
 
     room_blueprint_url = ""
     if searched_room:
-        room_blueprint_url = _room_blueprint_display_url(searched_room)
+        room_blueprint_url = room_blueprint_display_url(searched_room)
 
     # --- Dữ liệu dashboard (bám database) ---
     eq_total = Equipment.objects.count()
@@ -177,6 +266,7 @@ def home(request):
 
     context = {
         "stats": {
+            "branches": branches_count,
             "buildings": buildings_count,
             "rooms": rooms_count,
             "equipment": equipment_count,
@@ -186,11 +276,13 @@ def home(request):
             request.user.is_authenticated
             and (request.user.is_superuser or request.user.is_staff or _is_admin_role(role_name))
         ),
-        "is_facility": bool(request.user.is_authenticated and app_user and _is_facility_role(role_name)),
+        "is_facility": bool(
+            request.user.is_authenticated and app_user and _is_facility_or_technical_staff(role_name)
+        ),
         "is_teacher": bool(request.user.is_authenticated and app_user and _is_teacher_role(role_name)),
         "room_search_q": q_raw,
         "searched_room": searched_room,
-        "room_search_results": room_search_results,
+        "room_search_page": room_search_page,
         "room_blueprint_url": room_blueprint_url,
         "eq_total": eq_total,
         "eq_good_pct": eq_good_pct,
@@ -211,26 +303,300 @@ def home(request):
     return render(request, "home/index.html", context)
 
 
+def about_school(request):
+    """Trang giới thiệu quản trị động: Hero, giá trị cốt lõi, tin tức cập nhật."""
+    app_user = None
+    role_name = ""
+    if request.user.is_authenticated:
+        app_user, role_name = _current_role_name(request)
+
+    try:
+        hero_section = AboutHeroSection.objects.filter(is_active=True).first()
+    except (ProgrammingError, OperationalError):
+        hero_section = None
+
+    try:
+        core_values = list(AboutCoreValue.objects.filter(is_active=True).order_by("display_order", "-updated_at"))
+    except (ProgrammingError, OperationalError):
+        core_values = []
+
+    try:
+        about_announcements = list(AboutAnnouncement.objects.filter(is_published=True).order_by("-created_at", "-published_at")[:5])
+    except (ProgrammingError, OperationalError):
+        about_announcements = []
+
+    try:
+        about_events = list(
+            AboutFeaturedEvent.objects.filter(is_published=True).order_by("-created_at", "-published_at", "-event_date")[:3]
+        )
+    except (ProgrammingError, OperationalError):
+        about_events = []
+
+    latest_news = about_announcements[0] if about_announcements else None
+    side_news = about_announcements[1:] if len(about_announcements) > 1 else []
+
+    selected_news = None
+    selected_news_pk = request.GET.get("news")
+    if selected_news_pk:
+        try:
+            selected_news = AboutAnnouncement.objects.filter(is_published=True, pk=int(selected_news_pk)).first()
+        except (TypeError, ValueError):
+            selected_news = None
+
+    context = {
+        "is_admin": bool(
+            request.user.is_authenticated
+            and (request.user.is_superuser or request.user.is_staff or _is_admin_role(role_name))
+        ),
+        "is_facility": bool(
+            request.user.is_authenticated and app_user and _is_facility_or_technical_staff(role_name)
+        ),
+        "is_teacher": bool(request.user.is_authenticated and app_user and _is_teacher_role(role_name)),
+        "about_hero_section": hero_section,
+        "about_core_values": core_values,
+        "about_latest_news": latest_news,
+        "about_side_news": side_news,
+        "about_events": about_events,
+        "selected_news": selected_news,
+    }
+    return render(request, "home/about_school.html", context)
+
+
+def about_news_detail(request, pk: int):
+    """Chi tiết bài tin tức thuộc trang giới thiệu."""
+    article = get_object_or_404(AboutAnnouncement, pk=pk, is_published=True)
+    if request.GET.get("ajax") == "1" or request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse(
+            {
+                "type": "news",
+                "title": article.title,
+                "summary": article.summary,
+                "content": article.content,
+                "published_at": article.published_at.strftime("%d/%m/%Y %H:%M") if article.published_at else "",
+                "thumbnail": article.thumbnail.url if article.thumbnail else None,
+            }
+        )
+    return render(request, "home/about_news_detail.html", {"article": article})
+
+
+def about_event_detail(request, pk: int):
+    """Chi tiết sự kiện nổi bật thuộc trang giới thiệu."""
+    event = get_object_or_404(AboutFeaturedEvent, pk=pk, is_published=True)
+    if request.GET.get("ajax") == "1" or request.headers.get("x-requested-with") == "XMLHttpRequest":
+        return JsonResponse(
+            {
+                "type": "event",
+                "title": event.title,
+                "summary": event.summary,
+                "content": "",
+                "published_at": event.published_at.strftime("%d/%m/%Y %H:%M") if event.published_at else "",
+                "event_date": event.event_date.strftime("%d/%m/%Y") if event.event_date else "",
+                "image": event.image.url if event.image else None,
+            }
+        )
+    return JsonResponse({"detail": "This endpoint supports AJAX-only event detail fetch."})
+
+
+def about_updates(request):
+    """Trang hiển thị toàn bộ Tin tức và Sự kiện nổi bật."""
+    news_items = AboutAnnouncement.objects.filter(is_published=True).order_by("-created_at", "-published_at")
+    event_items = AboutFeaturedEvent.objects.filter(is_published=True).order_by("-created_at", "-published_at", "-event_date")
+    return render(
+        request,
+        "home/about_updates.html",
+        {
+            "news_items": news_items,
+            "event_items": event_items,
+        },
+    )
+
+
 class Login(LoginView):
     template_name = 'login.html'
     authentication_form = BootstrapAuthenticationForm
 
     def get_success_url(self):
         """
-        Sau khi đăng nhập: luôn giữ người dùng ở trang chủ.
-        Navbar/menu sẽ tự hiện các mục theo vai trò (role) để điều hướng sang trang khác.
+        Sau khi đăng nhập: nếu tài khoản mới tạo cần đổi mật khẩu thì đưa về trang đổi mật khẩu,
+        còn không thì về trang chủ như bình thường.
         """
+        app_user, role_name = _current_role_name(self.request)
+        if _requires_password_change(app_user, role_name):
+            return reverse("account_password_change")
         return reverse("home")
+
+
+def page_not_found(request, exception=None, invalid_path=None):
+    """Trang 404 thân thiện (handler404 khi DEBUG=False; catch-all khi DEBUG=True)."""
+    return render(request, "errors/404.html", status=404)
+
+
+PWD_SESSION_EMAIL = "pwd_reset_email"
+PWD_SESSION_USER_ID = "pwd_reset_user_id"
+PWD_VERIFY_ATTEMPTS = "pwd_reset_verify_attempts"
+PWD_VERIFY_MAX_ATTEMPTS = 10
+
+
+def _mask_email(addr: str) -> str:
+    if "@" not in addr:
+        return "***"
+    local, _, domain = addr.partition("@")
+    if len(local) <= 3:
+        return "***@" + domain
+    return local[:3] + "****@" + domain
+
+
+def forgot_password_request(request):
+    """Bước 1: nhập email → gửi mã 6 số qua Gmail/SMTP."""
+    if request.method == "POST":
+        form = ForgotPasswordEmailForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data["email"]
+            code = generate_six_digit_code()
+            code_hash = hash_reset_code(email, code)
+            ttl = int(getattr(settings, "PASSWORD_RESET_CODE_TTL_MINUTES", 15))
+            now = timezone.now()
+            PasswordResetCode.objects.filter(email=email, consumed=False).update(consumed=True)
+            PasswordResetCode.objects.create(
+                email=email,
+                code_hash=code_hash,
+                expires_at=now + timedelta(minutes=ttl),
+            )
+            send_password_reset_code_email(to_email=email, code=code, request=request)
+            request.session[PWD_SESSION_EMAIL] = email
+            request.session[PWD_VERIFY_ATTEMPTS] = 0
+            return redirect("password_reset_verify")
+    else:
+        form = ForgotPasswordEmailForm()
+    return render(request, "auth/forgot_password.html", {"form": form})
+
+
+def forgot_password_verify(request):
+    """Bước 2: nhập mã 6 số nhận qua email."""
+    email = request.session.get(PWD_SESSION_EMAIL)
+    if not email:
+        messages.warning(request, "Vui lòng nhập email trường ở bước trước.")
+        return redirect("password_reset")
+
+    if request.method == "POST":
+        form = VerifySixDigitForm(request.POST)
+        if form.is_valid():
+            code = form.cleaned_data["code"]
+            ch = hash_reset_code(email, code)
+            now = timezone.now()
+            row = (
+                PasswordResetCode.objects.filter(
+                    email=email,
+                    code_hash=ch,
+                    consumed=False,
+                    expires_at__gte=now,
+                )
+                .order_by("-created_at")
+                .first()
+            )
+            if row:
+                row.consumed = True
+                row.save(update_fields=["consumed"])
+                PasswordResetCode.objects.filter(email=email, consumed=False).update(consumed=True)
+                from django.contrib.auth import get_user_model
+
+                User = get_user_model()
+                user = User.objects.filter(email__iexact=email, is_active=True).first()
+                if user:
+                    request.session[PWD_SESSION_USER_ID] = user.pk
+                    request.session.pop(PWD_VERIFY_ATTEMPTS, None)
+                    return redirect("password_reset_set")
+            attempts = int(request.session.get(PWD_VERIFY_ATTEMPTS, 0)) + 1
+            request.session[PWD_VERIFY_ATTEMPTS] = attempts
+            if attempts >= PWD_VERIFY_MAX_ATTEMPTS:
+                messages.error(request, "Đã thử quá nhiều lần. Vui lòng nhập lại email để nhận mã mới.")
+                request.session.pop(PWD_SESSION_EMAIL, None)
+                request.session.pop(PWD_VERIFY_ATTEMPTS, None)
+                return redirect("password_reset")
+            form.add_error("code", "Mã không đúng hoặc đã hết hạn. Vui lòng kiểm tra email hoặc yêu cầu gửi lại.")
+    else:
+        form = VerifySixDigitForm()
+
+    return render(
+        request,
+        "auth/forgot_password_verify.html",
+        {"form": form, "email_masked": _mask_email(email)},
+    )
+
+
+def forgot_password_set(request):
+    """Bước 3: đặt mật khẩu mới sau khi mã đúng."""
+    from django.contrib.auth import get_user_model
+
+    User = get_user_model()
+    uid = request.session.get(PWD_SESSION_USER_ID)
+    if not uid:
+        messages.warning(request, "Phiên đặt lại mật khẩu không còn hiệu lực. Thử lại từ đầu.")
+        return redirect("password_reset")
+
+    user = User.objects.filter(pk=uid, is_active=True).first()
+    if not user:
+        request.session.pop(PWD_SESSION_USER_ID, None)
+        return redirect("password_reset")
+
+    if request.method == "POST":
+        form = BootstrapSetPasswordForm(user, request.POST)
+        if form.is_valid():
+            form.save()
+            AppUser.objects.filter(username__iexact=user.username).update(
+                password=user.password,
+                must_change_password=False,
+            )
+            request.session.pop(PWD_SESSION_USER_ID, None)
+            request.session.pop(PWD_SESSION_EMAIL, None)
+            return redirect("password_reset_complete")
+    else:
+        form = BootstrapSetPasswordForm(user)
+
+    return render(request, "auth/forgot_password_set.html", {"form": form})
+
+
+def forgot_password_complete(request):
+    return render(request, "auth/reset_password_done.html")
+
+
+@login_required
+def account_password_change(request):
+    app_user, role_name = _current_role_name(request)
+    is_facility = bool(app_user and _is_facility_or_technical_staff(role_name))
+    is_teacher = bool(app_user and _is_teacher_role(role_name))
+
+    if not (is_facility or is_teacher):
+        return redirect("home")
+
+    if request.method == "POST":
+        form = BootstrapPasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)
+            AppUser.objects.filter(username__iexact=user.username).update(
+                password=user.password,
+                must_change_password=False,
+            )
+            messages.success(request, "Đã đổi mật khẩu thành công.")
+            return redirect("facility_dashboard" if is_facility else "teacher_dashboard")
+    else:
+        form = BootstrapPasswordChangeForm(request.user)
+
+    context = {
+        "form": form,
+        "back_url": reverse("facility_dashboard" if is_facility else "teacher_dashboard"),
+        "back_label": "← Quay lại trang CSVC" if is_facility else "← Quay lại trang giảng viên",
+    }
+    return render(request, "auth/change_password.html", context)
 
 
 @login_required
 def map_view(request):
-    # 1. Lấy dữ liệu và chuyển sang GeoJSON
-    # Chúng ta lấy các trường cần thiết để hiển thị Popup (name, description, status...)
-    
-    buildings_geojson = serialize('geojson', Building.objects.all(), 
-                                  geometry_field='geom', 
-                                  fields=('name', 'description'))
+    # 1. GeoJSON khuôn viên: tòa nhà (có id để drill-down), cây, sự cố.
+    # Phòng / thiết bị trên WGS84 không tải sẵn — xem theo tầng và sơ đồ trong nhà.
+
+    buildings_geojson = buildings_geojson_dumps()
     
     trees_geojson = serialize('geojson', Tree.objects.all(), 
                               geometry_field='geom', 
@@ -251,8 +617,8 @@ def map_view(request):
                 e = asset.equipment
                 asset_search = [e.name or "", e.code or "", e.equipment_type or ""]
                 blueprint_url = ""
-                if getattr(e, "room", None) and getattr(e.room, "blueprint_url", None):
-                    blueprint_url = e.room.blueprint_url
+                if getattr(e, "room", None):
+                    blueprint_url = room_blueprint_display_url(e.room) or ""
             elif asset.asset_type == "tree" and asset.tree:
                 t = asset.tree
                 asset_search = [t.species or "", t.code or ""]
@@ -285,52 +651,22 @@ def map_view(request):
         {"type": "FeatureCollection", "features": incidents_features}
     )
 
-    # Rooms: tự build GeoJSON để bổ sung thông tin tầng/tòa nhà + ảnh blueprint
-    room_features = []
-    for room in Room.objects.select_related("floor", "floor__building").exclude(geom__isnull=True):
-        room_features.append(
-            {
-                "type": "Feature",
-                "geometry": json.loads(room.geom.geojson),
-                "properties": {
-                    "id": room.id,
-                    "name": room.name,
-                    "room_type": room.room_type,
-                    "capacity": room.capacity,
-                    "floor_name": room.floor.name if room.floor else "",
-                    "building_name": room.floor.building.name if room.floor and room.floor.building else "",
-                    "blueprint_url": room.blueprint_url or "",
-                    "blueprint_width": room.blueprint_width,
-                    "blueprint_height": room.blueprint_height,
-                },
-            }
-        )
-    rooms_geojson = json.dumps({"type": "FeatureCollection", "features": room_features})
+    rooms_geojson = json.dumps({"type": "FeatureCollection", "features": []})
 
-    # Equipment: bổ sung phòng/tầng/tòa nhà + ảnh blueprint của phòng
-    equipment_features = []
-    for eq in (
-        Equipment.objects.exclude(geom__isnull=True)
-        .select_related("room", "room__floor", "room__floor__building")
-    ):
-        equipment_features.append(
-            {
-                "type": "Feature",
-                "geometry": json.loads(eq.geom.geojson),
-                "properties": {
-                    "id": eq.id,
-                    "code": eq.code,
-                    "name": eq.name,
-                    "status": eq.status,
-                    "equipment_type": eq.equipment_type,
-                    "room_name": eq.room.name if eq.room else "",
-                    "floor_name": eq.room.floor.name if eq.room and eq.room.floor else "",
-                    "building_name": eq.room.floor.building.name if eq.room and eq.room.floor and eq.room.floor.building else "",
-                    "blueprint_url": (eq.room.blueprint_url if eq.room else "") or "",
-                },
-            }
-        )
-    equipment_geojson = json.dumps({"type": "FeatureCollection", "features": equipment_features})
+    equipment_geojson = json.dumps({"type": "FeatureCollection", "features": []})
+
+    branches_nav = []
+    for b in UniversityBranch.objects.all().order_by("name"):
+        row = {"id": b.id, "name": (b.name or "").strip() or f"Chi nhánh #{b.id}"}
+        if b.geom:
+            c = b.geom.centroid
+            row["lat"] = c.y
+            row["lng"] = c.x
+        else:
+            row["lat"] = None
+            row["lng"] = None
+        branches_nav.append(row)
+    branches_nav_json = json.dumps(branches_nav, ensure_ascii=False)
 
     # 2. Xác định nút quay lại phù hợp (Admin hoặc Nhân viên CSVC)
     back_url = None
@@ -344,7 +680,7 @@ def map_view(request):
             back_url = reverse("admin_dashboard")
             back_label = "← Quay lại trang quản trị"
         # Nhân viên CSVC (cả tiếng Anh & tiếng Việt)
-        elif _is_facility_role(role_name):
+        elif _is_facility_or_technical_staff(role_name):
             back_url = reverse("facility_dashboard")
             back_label = "← Quay lại dashboard CSVC"
         # Giáo viên
@@ -361,8 +697,84 @@ def map_view(request):
         'equipment_json': equipment_geojson,
         'back_url': back_url,
         'back_label': back_label,
+        'branches_nav_json': branches_nav_json,
     }
     return render(request, 'home/map.html', context)
+
+
+@login_required
+def map_building_floors(request, building_id):
+    if not Building.objects.filter(pk=building_id).exists():
+        return JsonResponse({"error": "Không tìm thấy tòa nhà."}, status=404)
+    return JsonResponse(floors_payload_for_building(building_id))
+
+
+@login_required
+def map_floor_rooms(request, floor_id):
+    if not Floor.objects.filter(pk=floor_id).exists():
+        return JsonResponse({"error": "Không tìm thấy tầng."}, status=404)
+    return JsonResponse(floor_rooms_geojson(floor_id))
+
+
+@login_required
+def map_floor_equipment(request, floor_id):
+    if not Floor.objects.filter(pk=floor_id).exists():
+        return JsonResponse({"error": "Không tìm thấy tầng."}, status=404)
+    return JsonResponse(floor_equipment_map_payload(floor_id))
+
+
+@login_required
+def map_room_layout(request, room_id):
+    data = room_layout_payload(room_id)
+    if not data:
+        return JsonResponse({"error": "Không tìm thấy phòng."}, status=404)
+    return JsonResponse(data)
+
+
+@login_required
+def map_equipment_search(request):
+    """
+    Tìm thiết bị theo mã / tên / loại (icontains), trả về room_id + floor_id + building_id để điều hướng drill-down.
+    GET: q=..., limit= (mặc định 20, tối đa 50)
+    """
+    q = (request.GET.get("q") or "").strip()
+    try:
+        limit = int(request.GET.get("limit") or 20)
+    except (TypeError, ValueError):
+        limit = 20
+    limit = max(1, min(limit, 50))
+    if not q:
+        return JsonResponse({"results": []})
+    qs = (
+        Equipment.objects.filter(
+            Q(code__icontains=q) | Q(name__icontains=q) | Q(equipment_type__icontains=q)
+        )
+        .select_related("room", "room__floor", "room__floor__building")
+        .order_by("code")[:limit]
+    )
+    results = []
+    for eq in qs:
+        room = eq.room
+        fl = room.floor if room else None
+        b = fl.building if fl else None
+        if not room or not fl or not b:
+            continue
+        results.append(
+            {
+                "equipment_id": eq.id,
+                "code": eq.code,
+                "name": eq.name or "",
+                "equipment_type": eq.equipment_type or "",
+                "status": eq.status or "",
+                "room_id": room.id,
+                "room_name": room.name or "",
+                "floor_id": fl.id,
+                "floor_name": fl.name or "",
+                "building_id": b.id,
+                "building_name": b.name or "",
+            }
+        )
+    return JsonResponse({"results": results})
 
 
 @login_required
@@ -378,6 +790,9 @@ def radius_search(request):
         radius = float(request.GET.get("radius", "20"))
     except (TypeError, ValueError):
         return JsonResponse({"error": "Tham số lat/lng/radius không hợp lệ."}, status=400)
+
+    if lat < 0 or lng < 0 or radius < 0:
+        return JsonResponse({"error": "lat, lng và bán kính không được âm."}, status=400)
 
     point = Point(lng, lat, srid=4326)
     layers_param = request.GET.get("layers", "trees,devices,rooms")
@@ -417,7 +832,7 @@ def radius_search(request):
                         and getattr(obj.room.floor, "building", None)
                         else ""
                     ),
-                    "blueprint_url": (obj.room.blueprint_url if getattr(obj, "room", None) else "") or "",
+                    "blueprint_url": room_blueprint_display_url(obj.room) if getattr(obj, "room", None) else "",
                 }
             elif isinstance(obj, Room):
                 props = {
@@ -432,7 +847,7 @@ def radius_search(request):
                         if getattr(obj, "floor", None) and getattr(obj.floor, "building", None)
                         else ""
                     ),
-                    "blueprint_url": obj.blueprint_url or "",
+                    "blueprint_url": room_blueprint_display_url(obj),
                     "blueprint_width": obj.blueprint_width,
                     "blueprint_height": obj.blueprint_height,
                 }
@@ -474,8 +889,15 @@ def dangerous_trees_near_rooms(request):
     """
     Truy vấn tất cả cây có health_status='dangerous'.
     Trả về FeatureCollection các cây nguy hiểm.
+    GET branch_id: chỉ cây thuộc chi nhánh đó.
     """
     dangerous_trees = Tree.objects.filter(health_status="dangerous").exclude(geom__isnull=True)
+    branch_raw = (request.GET.get("branch_id") or "").strip()
+    if branch_raw:
+        try:
+            dangerous_trees = dangerous_trees.filter(university_branch_id=int(branch_raw))
+        except (TypeError, ValueError):
+            pass
 
     features = []
     for tree in dangerous_trees:
@@ -505,13 +927,21 @@ def devices_to_check(request):
     """
     Truy vấn các thiết bị cần kiểm tra/bảo trì.
     Ở đây định nghĩa đơn giản: thiết bị có status != 'good'.
-    Có thể mở rộng thêm điều kiện theo last_maintenance nếu cần.
+    GET branch_id: chỉ thiết bị trong phòng thuộc tòa nhà của chi nhánh đó.
     """
     devices_qs = (
         Equipment.objects.exclude(geom__isnull=True)
         .exclude(status="good")
-        .select_related("room")
+        .select_related("room", "room__floor", "room__floor__building")
     )
+    branch_raw = (request.GET.get("branch_id") or "").strip()
+    if branch_raw:
+        try:
+            devices_qs = devices_qs.filter(
+                room__floor__building__university_branch_id=int(branch_raw)
+            )
+        except (TypeError, ValueError):
+            pass
 
     features = []
     for device in devices_qs:
@@ -526,7 +956,7 @@ def devices_to_check(request):
             "name": device.name,
             "status": device.status,
             "room_name": room.name if room else "",
-            "blueprint_url": room.blueprint_url if room else "",
+            "blueprint_url": room_blueprint_display_url(room) if room else "",
         }
         features.append(
             {
@@ -559,8 +989,11 @@ def facility_dashboard(request):
     """
     app_user, role_name = _current_role_name(request)
 
-    # Chỉ cho phép role Nhân viên CSVC (tiếng Anh hoặc tiếng Việt)
-    if not (app_user and _is_facility_role(role_name)):
+    if _requires_password_change(app_user, role_name):
+        return redirect("account_password_change")
+
+    # Nhân viên CSVC hoặc nhân viên kỹ thuật
+    if not (app_user and _is_facility_or_technical_staff(role_name)):
         return redirect("home")
 
     if request.method == "POST":
@@ -594,7 +1027,10 @@ def facility_incident(request):
     """
     app_user, role_name = _current_role_name(request)
 
-    if not (app_user and _is_facility_role(role_name)):
+    if _requires_password_change(app_user, role_name):
+        return redirect("account_password_change")
+
+    if not (app_user and _is_facility_or_technical_staff(role_name)):
         return redirect("home")
 
     if request.method == "POST":
@@ -602,12 +1038,22 @@ def facility_incident(request):
         if form.is_valid():
             incident = form.save(commit=False)
 
-            # Thiết lập vị trí sự cố theo vị trí tài sản
+            # Vị trí & liên kết phòng/tầng/tòa lấy từ tài sản — không cần chọn trên bản đồ
             asset = incident.asset
             if asset.asset_type == "equipment" and asset.equipment:
-                incident.geom = asset.equipment.geom
+                eq = asset.equipment
+                incident.geom = eq.geom
+                incident.room = eq.room
+                if eq.room:
+                    incident.floor = eq.room.floor
+                    if eq.room.floor:
+                        incident.building = eq.room.floor.building
             elif asset.asset_type == "tree" and asset.tree:
-                incident.geom = asset.tree.geom
+                tr = asset.tree
+                incident.geom = tr.geom
+                incident.room = None
+                incident.floor = None
+                incident.building = None
 
             incident.status = "open"
             incident.save()
@@ -621,9 +1067,14 @@ def facility_incident(request):
         .order_by("-reported_at")[:5]
     )
 
+    assets_meta = {str(a.id): a.asset_type for a in Asset.objects.only("id", "asset_type")}
+    types_meta = {str(t.id): list(t.applies_to or []) for t in IncidentType.objects.only("id", "applies_to")}
+
     context = {
         "form": form,
         "recent_incidents": recent_incidents,
+        "facility_assets_meta_json": json.dumps(assets_meta, ensure_ascii=False),
+        "facility_incident_types_meta_json": json.dumps(types_meta, ensure_ascii=False),
     }
     return render(request, "home/facility_incident.html", context)
 
@@ -636,7 +1087,11 @@ def facility_teacher_reports_history(request):
     - `delete`: xóa tin nhắn khỏi hệ thống.
     """
     app_user, role_name = _current_role_name(request)
-    if not (app_user and _is_facility_role(role_name)):
+
+    if _requires_password_change(app_user, role_name):
+        return redirect("account_password_change")
+
+    if not (app_user and _is_facility_or_technical_staff(role_name)):
         return redirect("home")
 
     if request.method == "POST":
@@ -654,8 +1109,8 @@ def facility_teacher_reports_history(request):
 
         return redirect("facility_teacher_reports_history")
 
-    latest_report = QuickIncidentReport.objects.order_by("-created_at").first()
-    reports = QuickIncidentReport.objects.order_by("-created_at").all()
+    latest_report = QuickIncidentReport.objects.order_by("-reported_at").first()
+    reports = QuickIncidentReport.objects.order_by("-reported_at").all()
 
     context = {
         "reports": reports,
@@ -681,28 +1136,39 @@ def teacher_dashboard(request):
     """
     app_user, role_name = _current_role_name(request)
 
+    if _requires_password_change(app_user, role_name):
+        return redirect("account_password_change")
+
     if not (app_user and _is_teacher_role(role_name)):
         return redirect("home")
 
     # Báo cáo sự cố nhanh dạng text (giảng viên gửi lên)
-    latest_quick_report = QuickIncidentReport.objects.order_by("-created_at").first()
+    latest_quick_report = (
+        QuickIncidentReport.objects.filter(sender=app_user).order_by("-reported_at").first()
+    )
 
+    room_q = (request.GET.get("room_q") or "").strip()
     if request.method == "POST":
         form = TeacherQuickIncidentReportForm(request.POST)
+        room_q = (request.POST.get("room_q") or room_q).strip()
         if form.is_valid():
             message = form.cleaned_data["message"].strip()
             if message:
                 QuickIncidentReport.objects.create(
                     sender=app_user,
-                    message=message,
+                    reporter_name=(app_user.username or request.user.username or "").strip(),
+                    description=message,
                     is_seen=False,
                 )
                 messages.success(request, "Đã gửi báo cáo sự cố nhanh đến CSVC.")
-            return redirect("teacher_dashboard")
+            redir = reverse("teacher_dashboard")
+            if room_q:
+                redir += "?" + urlencode({"room_q": room_q})
+            return redirect(redir)
     else:
         form = TeacherQuickIncidentReportForm()
 
-    # Lấy danh sách phòng + thiết bị để tính trạng thái
+    # Lấy danh sách phòng + thiết bị để tính trạng thái (lọc theo room_q)
     rooms = Room.objects.select_related("floor", "floor__building").prefetch_related("equipment_set").all()
 
     room_status_list = []
@@ -721,17 +1187,27 @@ def teacher_dashboard(request):
             status_label = "Chưa có thiết bị"
             status_badge = "secondary"
 
-        room_status_list.append(
-            {
-                "room": room,
-                "status_label": status_label,
-                "status_badge": status_badge,
-            }
-        )
+        item = {
+            "room": room,
+            "status_label": status_label,
+            "status_badge": status_badge,
+        }
+        if _teacher_room_status_matches(item, room_q):
+            room_status_list.append(item)
+
+    teacher_room_q_suffix = ("&" + urlencode({"room_q": room_q})) if room_q else ""
+
+    paginator = Paginator(room_status_list, TEACHER_ROOMS_PER_PAGE)
+    room_page = paginator.get_page(request.GET.get("page"))
+    pad_count = max(0, TEACHER_ROOMS_PER_PAGE - len(room_page.object_list))
+    room_pad_rows = [None] * pad_count
 
     context = {
-        "room_status_list": room_status_list,
+        "room_page": room_page,
+        "room_pad_rows": room_pad_rows,
         "teacher_quick_report_form": form,
         "latest_quick_report": latest_quick_report,
+        "teacher_room_search_q": room_q,
+        "teacher_room_q_suffix": teacher_room_q_suffix,
     }
     return render(request, "home/teacher_dashboard.html", context)

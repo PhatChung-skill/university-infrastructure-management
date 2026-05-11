@@ -17,6 +17,14 @@
   </div>
   <div class="card-body">
     {% if page_obj %}<p class="text-muted small mb-2">Tổng: {{ page_obj.paginator.count }} người dùng. Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}.</p>{% endif %}
+    <form method="get" class="row g-2 mb-3">
+      <div class="col-auto flex-grow-1">
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Tìm theo tên đăng nhập, email hoặc vai trò...">
+      </div>
+      <div class="col-auto">
+        <button type="submit" class="btn btn-outline-primary btn-sm">Tìm kiếm</button>
+      </div>
+    </form>
     <form method="post">
       {% csrf_token %}
       <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
@@ -31,7 +39,9 @@
         <thead class="table-light">
           <tr>
             <th style="width: 32px;"><input type="checkbox" data-admin-select-all></th>
+            <th>Email</th>
             <th>Tên đăng nhập</th>
+            <th>Chi nhánh</th>
             <th>Vai trò</th>
             <th class="text-end">Thao tác</th>
           </tr>
@@ -40,7 +50,9 @@
           {% for u in users %}
           <tr style="cursor: pointer;" data-href="{% url 'admin_user_edit' u.pk %}">
             <td onclick="event.stopPropagation();"><input type="checkbox" name="_selected_action" value="{{ u.pk }}"></td>
+            <td>{{ u.email|default:"-" }}</td>
             <td><a href="{% url 'admin_user_edit' u.pk %}" class="text-decoration-none fw-semibold text-success">{{ u.username }}</a></td>
+            <td>{{ u.university_branch|default:"-" }}</td>
             <td>{{ u.role|default:"-" }}</td>
             <td class="text-end" onclick="event.stopPropagation();">
               <a href="{% url 'admin_user_edit' u.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
@@ -48,7 +60,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="4" class="text-center text-muted">Chưa có người dùng nào. Nhấn «Thêm người dùng» để tạo mới.</td></tr>
+          <tr><td colspan="6" class="text-center text-muted">Chưa có người dùng nào. Nhấn «Thêm người dùng» để tạo mới.</td></tr>
           {% endfor %}
         </tbody>
       </table>

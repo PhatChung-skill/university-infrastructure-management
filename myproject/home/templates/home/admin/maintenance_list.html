@@ -2,6 +2,18 @@
 
 {% block title %}Quản lý bảo trì{% endblock %}
 
+{% block extra_head %}
+<style>
+  .inline-detail-row td { background: #f8fbf8; border-top: 0; }
+  .inline-detail-box {
+    border-left: 3px solid #43a047;
+    padding: .6rem .8rem;
+    font-size: .92rem;
+    color: #2f3b2f;
+  }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
   <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> / Bảo trì
 {% endblock %}
@@ -13,9 +25,25 @@
       <h5 class="mb-0">Phiếu bảo trì</h5>
       <small class="d-block mt-1">Lịch sử bảo trì tài sản (thiết bị / cây).</small>
     </div>
-    <a href="{% url 'admin_maintenance_add' %}" class="btn btn-light btn-sm">+ Thêm phiếu bảo trì</a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'admin_excel_import' %}?table=maintenance" class="btn btn-light btn-sm text-dark">Nhập Excel</a>
+      <a href="{% url 'admin_maintenance_add' %}" class="btn btn-light btn-sm">+ Thêm phiếu bảo trì</a>
+    </div>
   </div>
   <div class="card-body">
+    <form method="get" class="row g-2 mb-3">
+      <div class="col-md-10">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo mã/tên thiết bị, mã/loài cây, ghi chú...">
+      </div>
+      <div class="col-md-2 d-grid">
+        <button class="btn btn-admin-primary" type="submit">Tìm</button>
+      </div>
+      {% if q %}
+      <div class="col-md-12">
+        <a class="btn btn-link p-0 text-decoration-none" href="{% url 'admin_maintenance_list' %}">↺ Quay lại danh sách ban đầu</a>
+      </div>
+      {% endif %}
+    </form>
     <form method="post">
       {% csrf_token %}
       <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
@@ -43,13 +71,36 @@
           <tr>
             <td><input type="checkbox" name="_selected_action" value="{{ m.pk }}"></td>
             <td>{{ m.maintenance_date|date:"d/m/Y" }}</td>
-            <td>{{ m.asset }}</td>
+            <td>
+              {% if m.asset and m.asset.equipment %}
+                {{ m.asset.equipment.name|default:m.asset.equipment.code }}
+              {% elif m.asset and m.asset.tree %}
+                {{ m.asset.tree.code }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
             <td>{{ m.get_maintenance_type_display }}</td>
-            <td>{{ m.staff|default:"-" }}</td>
+            <td>
+              {% if m.staff %}
+                {{ m.staff.username|default:m.staff.email|default:"-" }}
+              {% else %}
+                -
+              {% endif %}
+            </td>
             <td>{% if m.cost %}{{ m.cost|floatformat:0 }} đ{% else %}-{% endif %}</td>
             <td class="text-end">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle-detail="maintenance-{{ m.pk }}">Xem</button>
               <a href="{% url 'admin_maintenance_edit' m.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
               <a href="{% url 'admin_maintenance_delete' m.pk %}" class="btn btn-outline-danger btn-sm">Xóa</a>
+            </td>
+          </tr>
+          <tr id="maintenance-{{ m.pk }}" class="inline-detail-row d-none">
+            <td></td>
+            <td colspan="6">
+              <div class="inline-detail-box">
+                <div><strong>Ghi chú:</strong> {{ m.note|default:"" }}</div>
+              </div>
             </td>
           </tr>
           {% empty %}
@@ -61,11 +112,28 @@
     </form>
     {% if is_paginated %}
     <nav class="mt-3"><ul class="pagination pagination-sm mb-0">
-      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a></li>{% endif %}
+      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ q }}">«</a></li>{% endif %}
       <li class="page-item disabled"><span class="page-link">Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li>
-      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a></li>{% endif %}
+      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ q }}">»</a></li>{% endif %}
     </ul></nav>
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-toggle-detail]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var id = btn.getAttribute('data-toggle-detail');
+        var row = document.getElementById(id);
+        if (!row) return;
+        row.classList.toggle('d-none');
+      });
+    });
+  });
+</script>
 {% endblock %}

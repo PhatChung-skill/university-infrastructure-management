@@ -2,6 +2,75 @@
 
 {% block title %}Quản lý sự cố{% endblock %}
 
+{% block extra_head %}
+<style>
+  .incident-table th,
+  .incident-table td {
+    vertical-align: middle;
+  }
+  .incident-title {
+    font-weight: 600;
+    color: #2e7d32;
+    text-decoration: none;
+  }
+  .incident-title:hover {
+    text-decoration: underline;
+  }
+  .incident-submeta {
+    font-size: .82rem;
+    color: #6c757d;
+    line-height: 1.35;
+  }
+  .incident-asset {
+    line-height: 1.35;
+  }
+  .incident-badge {
+    font-size: .74rem;
+    font-weight: 600;
+    padding: .28rem .52rem;
+    border-radius: 999px;
+  }
+  .incident-priority-low { background: #e8f5e9; color: #1b5e20; }
+  .incident-priority-medium { background: #fff3cd; color: #7c5700; }
+  .incident-priority-high { background: #fdecea; color: #842029; }
+  .incident-status-open { background: #e3f2fd; color: #0d47a1; }
+  .incident-status-processing { background: #fff3cd; color: #7c5700; }
+  .incident-status-closed { background: #e8f5e9; color: #1b5e20; }
+  .incident-actions {
+    display: flex;
+    gap: .4rem;
+    justify-content: flex-end;
+    align-items: center;
+    flex-wrap: nowrap;
+    min-width: 160px;
+  }
+  .incident-actions .btn {
+    min-width: 52px;
+  }
+  .incident-table th:last-child,
+  .incident-table td:last-child {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    background: #fff;
+    box-shadow: -2px 0 4px rgba(0,0,0,0.05);
+  }
+  .incident-table th:last-child {
+    z-index: 3;
+  }
+  .inline-detail-row td {
+    background: #f8fbf8;
+    border-top: 0;
+  }
+  .inline-detail-box {
+    border-left: 3px solid #43a047;
+    padding: .65rem .85rem;
+    font-size: .92rem;
+    color: #2f3b2f;
+  }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
   <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> / Sự cố
 {% endblock %}
@@ -13,7 +82,10 @@
       <h5 class="mb-0">Sự cố</h5>
       <small class="d-block mt-1">Danh sách sự cố. Có tọa độ sẽ hiển thị trên bản đồ.</small>
     </div>
-    <a href="{% url 'admin_incident_add' %}" class="btn btn-light btn-sm">+ Thêm sự cố</a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'admin_excel_import' %}?table=incident" class="btn btn-light btn-sm text-dark">Nhập Excel</a>
+      <a href="{% url 'admin_incident_add' %}" class="btn btn-light btn-sm">+ Thêm sự cố</a>
+    </div>
   </div>
   <div class="card-body">
     <form method="get" class="row g-2 mb-3">
@@ -47,32 +119,78 @@
         <button type="submit" class="btn btn-outline-success btn-sm">Thực hiện</button>
       </div>
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0">
+        <table class="table table-sm table-hover align-middle mb-0 incident-table">
         <thead class="table-light">
           <tr>
             <th style="width: 32px;"><input type="checkbox" data-admin-select-all></th>
-            <th>Tiêu đề</th>
-            <th>Tài sản</th>
-            <th>Loại</th>
-            <th>Mức độ</th>
-            <th>Trạng thái</th>
-            <th>Thời gian</th>
-            <th class="text-end">Thao tác</th>
+            <th style="min-width: 180px;">Tiêu đề</th>
+            <th style="min-width: 240px;">Tài sản / vị trí</th>
+            <th style="min-width: 170px;">Loại sự cố</th>
+            <th style="width: 90px;">Mức độ</th>
+            <th style="width: 130px;">Trạng thái</th>
+            <th style="min-width: 130px;">Thời gian</th>
+            <th class="text-end" style="width: 130px;">Thao tác</th>
           </tr>
         </thead>
         <tbody>
           {% for i in incidents %}
           <tr style="cursor:pointer;" data-href="{% url 'admin_incident_edit' i.pk %}">
             <td onclick="event.stopPropagation();"><input type="checkbox" name="_selected_action" value="{{ i.pk }}"></td>
-            <td><a class="text-decoration-none fw-semibold text-success" href="{% url 'admin_incident_edit' i.pk %}">{{ i.title|truncatewords:6 }}</a></td>
-            <td>{{ i.asset }}</td>
-            <td>{{ i.incident_type|default:"-" }}</td>
-            <td>{{ i.get_priority_display }}</td>
-            <td>{{ i.get_status_display }}</td>
-            <td>{{ i.reported_at|date:"d/m/Y H:i" }}</td>
+            <td>
+              <a class="incident-title" href="{% url 'admin_incident_edit' i.pk %}">
+                {{ i.title|default:"(Không có tiêu đề)"|truncatechars:42 }}
+              </a>
+            </td>
+            <td>
+              <div class="incident-asset">{{ i.asset|default:"-" }}</div>
+              {% if i.location_summary %}
+                <div class="incident-submeta">{{ i.location_summary }}</div>
+              {% endif %}
+            </td>
+            <td>
+              <div>{{ i.incident_type|default:"-" }}</div>
+              {% if i.incident_type and i.incident_type.applies_to %}
+                <div class="mt-1 d-flex gap-1 flex-wrap">
+                  {% if 'emergency' in i.incident_type.applies_to %}<span class="badge bg-danger">Khẩn cấp</span>{% endif %}
+                  {% if 'security' in i.incident_type.applies_to %}<span class="badge bg-dark">An ninh</span>{% endif %}
+                  {% if 'facility' in i.incident_type.applies_to %}<span class="badge bg-warning text-dark">CSVC</span>{% endif %}
+                  {% if 'equipment' in i.incident_type.applies_to %}<span class="badge bg-primary">Thiết bị</span>{% endif %}
+                  {% if 'tree' in i.incident_type.applies_to %}<span class="badge bg-success">Cây xanh</span>{% endif %}
+                </div>
+              {% endif %}
+            </td>
+            <td>
+              <span class="incident-badge incident-priority-{{ i.priority|default:'medium' }}">
+                {{ i.get_priority_display|default:"-" }}
+              </span>
+            </td>
+            <td>
+              <span class="incident-badge incident-status-{{ i.status|default:'open' }}">
+                {{ i.get_status_display|default:"-" }}
+              </span>
+            </td>
+            <td>
+              {% if i.reported_at %}
+                <div>{{ i.reported_at|date:"d/m/Y" }}</div>
+                <div class="incident-submeta">{{ i.reported_at|date:"H:i" }}</div>
+              {% else %}
+                -
+              {% endif %}
+            </td>
             <td class="text-end" onclick="event.stopPropagation();">
-              <a href="{% url 'admin_incident_edit' i.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
-              <a href="{% url 'admin_incident_delete' i.pk %}" class="btn btn-outline-danger btn-sm">Xóa</a>
+              <div class="incident-actions">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle-detail="incident-{{ i.pk }}">Xem</button>
+                <a href="{% url 'admin_incident_edit' i.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
+                <a href="{% url 'admin_incident_delete' i.pk %}" class="btn btn-outline-danger btn-sm">Xóa</a>
+              </div>
+            </td>
+          </tr>
+          <tr id="incident-{{ i.pk }}" class="inline-detail-row d-none">
+            <td></td>
+            <td colspan="7">
+              <div class="inline-detail-box">
+                <div><strong>Mô tả sự cố:</strong> {{ i.description|default:"" }}</div>
+              </div>
             </td>
           </tr>
           {% empty %}
@@ -91,4 +209,21 @@
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-toggle-detail]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var id = btn.getAttribute('data-toggle-detail');
+        var row = document.getElementById(id);
+        if (!row) return;
+        row.classList.toggle('d-none');
+      });
+    });
+  });
+</script>
 {% endblock %}

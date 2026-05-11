@@ -13,8 +13,35 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 import sys
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # ... (Code cũ của bạn giữ nguyên) ...
+
+
+def _load_env_file(env_file: Path) -> None:
+    """Load simple KEY=VALUE pairs from .env into process env."""
+    if not env_file.exists():
+        return
+
+    for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip()
+
+        if value and len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+            value = value[1:-1]
+
+        if key:
+            os.environ.setdefault(key, value)
+
+
+def _safe_console_text(value: object) -> str:
+    """Return ASCII-safe text for Windows consoles with limited encodings."""
+    return str(value).encode("ascii", errors="backslashreplace").decode("ascii")
 
 # --- CẤU HÌNH GDAL ĐỘNG (TEAMWORK FRIENDLY) ---
 if os.name == 'nt':
@@ -56,7 +83,10 @@ if os.name == 'nt':
     else:
         # Trường hợp máy đồng nghiệp chưa cài thư viện
         # Keep message ASCII-compatible to avoid UnicodeEncodeError in Windows console.
-        print(f"WARNING: GDAL Warning: Chua cai dat thu vien GDAL tai {OSGEO_PATH}")
+        print(
+            "WARNING: GDAL Warning: Chua cai dat thu vien GDAL tai "
+            f"{_safe_console_text(OSGEO_PATH)}"
+        )
         # Fallback: locate GDAL/GEOS DLL from Anaconda (used by this project setup).
         # This avoids failing Django GIS startup when `osgeo` python package isn't installed in venv.
         try:
@@ -75,6 +105,37 @@ if os.name == 'nt':
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+_load_env_file(BASE_DIR / ".env")
+
+# Final fallback for Windows: if running with a non-project interpreter (e.g. Anaconda),
+# try loading GDAL/GEOS DLLs from project's local virtual environments.
+if os.name == "nt" and "GDAL_LIBRARY_PATH" not in globals():
+    project_root = BASE_DIR.parent
+    gdal_candidates = [
+        project_root / "venv" / "Lib" / "site-packages" / "osgeo",
+        project_root / ".venv" / "Lib" / "site-packages" / "osgeo",
+    ]
+    for osgeo_dir in gdal_candidates:
+        if not osgeo_dir.exists():
+            continue
+        try:
+            if hasattr(os, "add_dll_directory"):
+                os.add_dll_directory(str(osgeo_dir))
+        except Exception:
+            pass
+        os.environ["PATH"] = str(osgeo_dir) + ";" + os.environ.get("PATH", "")
+        gdal_dll = osgeo_dir / "gdal.dll"
+        geos_dll = osgeo_dir / "geos_c.dll"
+        if gdal_dll.exists():
+            GDAL_LIBRARY_PATH = str(gdal_dll)
+        else:
+            first_gdal = next(iter(osgeo_dir.glob("gdal*.dll")), None)
+            if first_gdal:
+                GDAL_LIBRARY_PATH = str(first_gdal)
+        if geos_dll.exists():
+            GEOS_LIBRARY_PATH = str(geos_dll)
+        if "GDAL_LIBRARY_PATH" in globals():
+            break
 
 
 # Quick-start development settings - unsuitable for production
@@ -86,8 +147,7 @@ SECRET_KEY = 'django-insecure-ozavqcbs_@5x8zy&&-cw!+%9hookrc2*56bpfft_l+mai^!fho
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+# ALLOWED_HOSTS được cấu hình cuối file (kèm email / link reset mật khẩu).
 
 # Application definition
 
@@ -98,6 +158,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres',
     'home',
     'django.contrib.gis',
 ]
@@ -138,14 +199,13 @@ WSGI_APPLICATION = 'myproject.wsgi.application'
 DATABASES = {
     "default": {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'School infrastructure management',
-        'USER': 'postgres',
-        'PASSWORD': '123',
-        'HOST': 'localhost',
-        'PORT': '5433',
+        'NAME': os.environ.get('POSTGRES_DB'),
+        'USER': os.environ.get('POSTGRES_USER'),
+        'PASSWORD': os.environ.get('POSTGRES_PASSWORD'),
+        'HOST': os.environ.get('DB_HOST', 'localhost'),
+        'PORT': os.environ.get('DB_PORT', '5432'),
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -196,4 +256,52 @@ LOGIN_URL = '/login/'
 
 # Sau khi logout, nhảy về trang login (hoặc trang chủ tùy bạn)
 LOGOUT_REDIRECT_URL = 'home'
+
+# --- Gửi email (quên mật khẩu) ---
+# Mailtrap SMTP (Sandbox) cho luồng gửi mã 6 số.
+EMAIL_BACKEND = os.environ.get(
+    "DJANGO_EMAIL_BACKEND",
+    "django.core.mail.backends.smtp.EmailBackend",
+)
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "sandbox.smtp.mailtrap.io")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "2525") or "2525")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "1") == "1"
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "3babe0707f7c5f")
+# Luôn lấy mật khẩu thật từ biến môi trường, không hardcode trong source code.
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+if (
+    not DEBUG
+    and EMAIL_BACKEND == "django.core.mail.backends.smtp.EmailBackend"
+    and not EMAIL_HOST_PASSWORD
+):
+    raise ImproperlyConfigured(
+        "EMAIL_HOST_PASSWORD is required in production when using SMTP backend."
+    )
+# Gmail: dùng App Password (bảo mật 2 lớp) — ví dụ:
+#   set DJANGO_EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+#   set EMAIL_HOST=smtp.gmail.com
+#   set EMAIL_HOST_USER=ten@gmail.com
+#   set EMAIL_HOST_PASSWORD=xxxx_app_password
+#   set DEFAULT_FROM_EMAIL=HCMUNRE IT <ten@gmail.com>
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", "HCMUNRE IT <noreply@localhost>")
+
+# Email trường: chỉ domain cụ thể. Để trống tuple này thì dùng SCHOOL_EMAIL_DOMAIN_SUFFIXES bên dưới.
+SCHOOL_EMAIL_ALLOWED_DOMAINS = (
+    "hcmunre.edu.vn",
+)
+
+# Khi SCHOOL_EMAIL_ALLOWED_DOMAINS rỗng: chấp nhận đuôi (vd .edu.vn).
+SCHOOL_EMAIL_DOMAIN_SUFFIXES = (
+    ".edu.vn",
+)
+
+# Quên mật khẩu — mã 6 số qua email
+PASSWORD_RESET_CODE_TTL_MINUTES = 15
+PASSWORD_RESET_EMAIL_SUBJECT = "[HCMUNRE IT] Mã xác nhận đặt lại mật khẩu"
+PASSWORD_RESET_EMAIL_BRAND = "HCMUNRE IT"
+PASSWORD_RESET_SUPPORT_LINE = os.environ.get("PASSWORD_RESET_SUPPORT_LINE", "")
+
+# Cho link trong email reset và chạy server (bổ sung tên miền thật khi deploy).
+_extra_hosts = [s.strip() for s in os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",") if s.strip()]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", *_extra_hosts]
 

@@ -21,8 +21,16 @@
         <form method="post" novalidate>
           {% csrf_token %}
           <div class="mb-3">
+            <label class="form-label">{{ form.email.label }}</label>
+            {{ form.email }}{% for e in form.email.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
             <label class="form-label">{{ form.username.label }}</label>
             {{ form.username }}{% for e in form.username.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ form.university_branch.label }}</label>
+            {{ form.university_branch }}{% for e in form.university_branch.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
           <div class="mb-3">
             <label class="form-label">{{ form.role.label }}</label>

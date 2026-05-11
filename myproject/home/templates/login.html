@@ -6,8 +6,33 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!-- Bootstrap CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/login.css' %}">
   <title>Đăng nhập</title>
+  <style>
+    .password-toggle-wrap {
+      position: relative;
+    }
+    .password-toggle-wrap .form-control {
+      padding-right: 2.6rem;
+    }
+    .password-toggle-btn {
+      position: absolute;
+      top: 50%;
+      right: .5rem;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      color: #5f6368;
+      padding: .1rem .25rem;
+      line-height: 1;
+      z-index: 3;
+      cursor: pointer;
+    }
+    .password-toggle-btn:hover {
+      color: #2e7d32;
+    }
+  </style>
 </head>
 <body class="login-bg">
   <div class="container d-flex align-items-center justify-content-center min-vh-100">
@@ -35,6 +60,9 @@
               {% for error in form.password.errors %}
                 <div class="invalid-feedback d-block">{{ error }}</div>
               {% endfor %}
+              <div class="d-flex justify-content-end mt-1">
+                <a href="{% url 'password_reset' %}" class="small text-decoration-none" style="color: #2e7d32;">Quên mật khẩu?</a>
+              </div>
             </div>
 
             <div class="d-grid gap-2">
@@ -49,5 +77,37 @@
   </div>
   <!-- Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function initPasswordVisibilityToggles() {
+      function enhancePasswordInput(input) {
+        if (!input || input.dataset.eyeEnhanced === "1") return;
+        var wrap = document.createElement("div");
+        wrap.className = "password-toggle-wrap";
+        input.parentNode.insertBefore(wrap, input);
+        wrap.appendChild(input);
+
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "password-toggle-btn";
+        btn.setAttribute("aria-label", "Hiện mật khẩu");
+        btn.setAttribute("title", "Hiện mật khẩu");
+        btn.innerHTML = '<i class="bi bi-eye" aria-hidden="true"></i>';
+        wrap.appendChild(btn);
+
+        btn.addEventListener("click", function () {
+          var isHidden = input.type === "password";
+          input.type = isHidden ? "text" : "password";
+          btn.innerHTML = isHidden
+            ? '<i class="bi bi-eye-slash" aria-hidden="true"></i>'
+            : '<i class="bi bi-eye" aria-hidden="true"></i>';
+          btn.setAttribute("aria-label", isHidden ? "Ẩn mật khẩu" : "Hiện mật khẩu");
+          btn.setAttribute("title", isHidden ? "Ẩn mật khẩu" : "Hiện mật khẩu");
+        });
+        input.dataset.eyeEnhanced = "1";
+      }
+
+      document.querySelectorAll('input[type="password"]').forEach(enhancePasswordInput);
+    })();
+  </script>
 </body>
 </html>

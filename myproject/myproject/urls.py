@@ -29,6 +29,13 @@ urlpatterns = [
     path('django-admin/', admin.site.urls),
 ]
 
+handler404 = "home.views.page_not_found"
+
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+# Luôn đặt sau static/media (DEBUG) để không chặn file tĩnh.
+urlpatterns += [
+    path("<path:invalid_path>", core_views.page_not_found),
+]
 

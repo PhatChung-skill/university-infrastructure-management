@@ -1,0 +1,74 @@
+{% extends "home/admin_base.html" %}
+
+{% block title %}Quản lý Banner & Lời ngỏ{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> / Banner & Lời ngỏ
+{% endblock %}
+
+{% block content %}
+<div class="card card-admin mb-4">
+  <div class="card-admin-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h5 class="mb-0">Banner & Lời ngỏ</h5>
+      <small class="d-block mt-1">Quản lý khối Hero: ảnh nền, tiêu đề và lời ngỏ.</small>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <form method="post" action="{% url 'admin_about_reset_sample_data' %}" onsubmit="return confirm('Thao tác này sẽ xóa dữ liệu hiện tại của trang giới thiệu và nạp lại dữ liệu mẫu. Tiếp tục?');">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-warning btn-sm">Khôi phục dữ liệu mẫu</button>
+      </form>
+      <a href="{% url 'admin_about_hero_add' %}" class="btn btn-light btn-sm">+ Thêm Banner</a>
+    </div>
+  </div>
+  <div class="card-body">
+    <form method="get" class="row g-2 mb-3">
+      <div class="col-md-10">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo tiêu đề hoặc lời ngỏ...">
+      </div>
+      <div class="col-md-2 d-grid">
+        <button class="btn btn-admin-primary" type="submit">Tìm</button>
+      </div>
+    </form>
+    <form method="post">
+      {% csrf_token %}
+      <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+        <select name="action" class="form-select form-select-sm" style="width: 220px;">
+          <option value="">-- Hành động --</option>
+          <option value="delete_selected">Xóa các mục đã chọn</option>
+        </select>
+        <button type="submit" class="btn btn-outline-success btn-sm">Thực hiện</button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 32px;"><input type="checkbox" data-admin-select-all></th>
+              <th>Tiêu đề</th>
+              <th>Ảnh nền</th>
+              <th>Trạng thái</th>
+              <th class="text-end">Thao tác</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in hero_sections %}
+              <tr data-href="{% url 'admin_about_hero_edit' item.pk %}">
+                <td><input type="checkbox" name="_selected_action" value="{{ item.pk }}"></td>
+                <td><a href="{% url 'admin_about_hero_edit' item.pk %}" class="text-decoration-none fw-semibold text-success">{{ item.title }}</a></td>
+                <td>{% if item.background_image %}<span class="text-success">Đã có</span>{% else %}<span class="text-muted">Không</span>{% endif %}</td>
+                <td>{% if item.is_active %}<span class="badge text-bg-success">Đang dùng</span>{% else %}<span class="badge text-bg-secondary">Tắt</span>{% endif %}</td>
+                <td class="text-end">
+                  <a href="{% url 'admin_about_hero_edit' item.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
+                  <a href="{% url 'admin_about_hero_delete' item.pk %}" class="btn btn-outline-danger btn-sm">Xóa</a>
+                </td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="5" class="text-center text-muted">Chưa có dữ liệu Banner & Lời ngỏ.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

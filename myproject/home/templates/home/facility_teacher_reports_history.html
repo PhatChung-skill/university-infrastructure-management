@@ -50,6 +50,38 @@
         background: linear-gradient(135deg, #1b5e20, #2e7d32);
         border-color: #1b5e20;
       }
+      @media (max-width: 767.98px) {
+        .navbar-csvc {
+          margin-bottom: .75rem !important;
+        }
+        .navbar-csvc .container-fluid {
+          padding-left: .75rem;
+          padding-right: .75rem;
+        }
+        .navbar-csvc .navbar-brand {
+          max-width: 68vw;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+        .card-csvc {
+          border-radius: 12px;
+        }
+        .card-csvc-header {
+          border-radius: 12px 12px 0 0;
+          padding: .85rem 1rem;
+        }
+        .card-body.p-4 {
+          padding: 1rem !important;
+        }
+        .table-responsive {
+          border: 1px solid rgba(46, 125, 50, .14);
+          border-radius: 10px;
+        }
+        .table {
+          min-width: 700px;
+        }
+      }
     </style>
   </head>
   <body>
@@ -128,17 +160,19 @@
                     <tbody>
                       {% for r in reports %}
                         <tr class="{% if latest_report and r.id == latest_report.id %}table-primary{% endif %}">
-                          <td>{{ r.created_at|date:"d/m/Y H:i" }}</td>
+                          <td>{{ r.reported_at|date:"d/m/Y H:i" }}</td>
                           <td>
                             {% if r.sender %}
                               {{ r.sender.username }}
+                            {% elif r.reporter_name %}
+                              {{ r.reporter_name }}
                             {% else %}
                               -
                             {% endif %}
                           </td>
                           <td style="max-width: 420px;">
                             <div style="white-space: pre-wrap;">
-                              {{ r.message|linebreaksbr }}
+                              {{ r.description|linebreaksbr }}
                             </div>
                             {% if latest_report and r.id == latest_report.id %}
                               <div class="small text-muted mt-1">Tin nhắn mới nhất</div>

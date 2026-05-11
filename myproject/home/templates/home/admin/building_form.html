@@ -39,6 +39,10 @@
             {{ form.description }}{% for e in form.description.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
           <div class="mb-3">
+            <label class="form-label">{{ form.university_branch.label }}</label>
+            {{ form.university_branch }}{% for e in form.university_branch.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
             <label class="form-label">{{ form.geom_wkt.label }}</label>
             {{ form.geom_wkt }}{% for e in form.geom_wkt.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
             <small class="text-muted d-block mt-1">Ví dụ: POLYGON((106.665 10.798, 106.666 10.798, 106.666 10.799, 106.665 10.799, 106.665 10.798))</small>
@@ -75,12 +79,19 @@
 <script>
 (function() {
   var defaultCenter = [10.7984, 106.6655];
+  var branchCenters = {{ branch_centers_json|safe }};
   var wktInput = document.getElementById('id_geom_wkt');
+  var branchSelect = document.getElementById('id_university_branch');
   var mapEl = document.getElementById('building-map');
   if (!mapEl) return;
 
   var map = L.map('building-map').setView(defaultCenter, 18);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxNativeZoom: 20,
+    maxZoom: 22,
+  }).addTo(map);
 
   var drawnItems = new L.FeatureGroup();
   map.addLayer(drawnItems);
@@ -199,6 +210,15 @@
 
   // Initial render (edit case)
   renderFromWkt();
+
+  if (branchSelect) {
+    branchSelect.addEventListener('change', function () {
+      var val = branchSelect.value;
+      if (!val || !branchCenters[val]) return;
+      var c = branchCenters[val];
+      map.setView([c[0], c[1]], 19);
+    });
+  }
 
   // Optional: if user pastes WKT manually, try to render it
   var wktDebounce = null;

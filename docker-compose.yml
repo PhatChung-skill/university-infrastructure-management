@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    container_name: university_db
+    env_file:
+      - .env
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./lt_gis.sql:/docker-entrypoint-initdb.d/lt_gis.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d 'School management'"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  web:
+    image: trantuanminh/university-web:1.0.1
+    container_name: university_web
+    command: >
+      bash -c "
+        echo 'Waiting for database...'
+        while ! pg_isready -h db -U postgres; do
+          sleep 2
+        done
+        echo 'Database is ready!'
+        python manage.py runserver 0.0.0.0:8000
+      "
+    volumes:
+      - ./myproject:/app
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

@@ -1,0 +1,791 @@
+{% load static %}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Giới thiệu trường - HCMUNRE WebGIS</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root{
+      --brand:#2e7d32;
+      --brand-dark:#1b5e20;
+      --brand-soft:#e8f5e9;
+      --ink:#0f172a;
+      --muted:#475569;
+      --soft:#f6faf7;
+      --border:rgba(27,94,32,.12);
+      --shadow:0 12px 32px rgba(15,46,20,.08);
+      --hero-overlay:linear-gradient(180deg, rgba(15,23,42,.05), rgba(15,23,42,.5));
+    }
+    body{ color:var(--ink); background:var(--soft); }
+    .navbar-blur{
+      background: rgba(255,255,255,.92);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border);
+    }
+    .brand-badge{ display:flex; align-items:center; gap:10px; min-width:0; }
+    .brand-badge img{
+      width:40px; height:40px; object-fit:contain;
+      border-radius:10px; background:#fff; border:1px solid var(--border);
+    }
+    .brand-title{
+      font-weight:800; letter-spacing:.2px; white-space:nowrap;
+      overflow:hidden; text-overflow:ellipsis; max-width:58vw;
+    }
+    .hero{ padding:38px 0 22px; }
+    .hero-card{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:20px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .hero-media{
+      position:relative;
+      min-height:420px;
+      background: linear-gradient(130deg, rgba(46,125,50,.92), rgba(27,94,32,.82));
+      display:flex;
+      flex-direction:column;
+      justify-content:flex-start;
+      padding:20px;
+      color:#fff;
+      overflow:hidden;
+    }
+    .hero-media::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background: var(--hero-overlay);
+      z-index:1;
+    }
+    .hero-media .badge{
+      background:rgba(255,255,255,.18);
+      border:1px solid rgba(255,255,255,.55);
+      color:#f8fafc;
+    }
+    .hero-overlay-content{
+      position:relative;
+      z-index:2;
+      max-width:92%;
+      text-shadow:0 2px 8px rgba(15,23,42,.45);
+    }
+    .hero-overlay-title{
+      font-weight:800;
+      line-height:1.25;
+      margin:12px 0 0;
+      color:#f8fafc;
+    }
+    .hero-photo-cover{
+      position:absolute;
+      inset:0;
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      object-position:center 45%;
+      display:block;
+      z-index:0;
+    }
+    .hero-copy{ padding:22px; }
+    .hero-intro-chip{
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid var(--border); color:#1f2937;
+      background:#f0fdf4; border-radius:999px; padding:4px 12px;
+      font-size:.85rem; font-weight:600; margin-bottom:10px;
+    }
+    .section{ padding:56px 0; }
+    .section-title{ font-weight:900; letter-spacing:-.2px; color:#0c4a6e; margin-bottom:6px; }
+    .section-sub{ color:var(--muted); margin-bottom:22px; }
+    .card-soft{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:16px;
+      box-shadow:0 8px 20px rgba(15,46,20,.05);
+      padding:18px;
+      height:100%;
+    }
+    .campus-title{ font-weight:800; color:var(--brand-dark); }
+    .spec-list li{ margin-bottom:7px; color:#334155; }
+    .tag{
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:999px;
+      font-size:.8rem;
+      background:var(--brand-soft);
+      color:var(--brand-dark);
+      border:1px solid var(--border);
+      margin:0 6px 6px 0;
+    }
+    .timeline{ border-left:2px dashed rgba(46,125,50,.25); margin-left:6px; padding-left:14px; }
+    .timeline .step{ margin-bottom:10px; color:#334155; }
+    .quote{
+      border-left:4px solid var(--brand);
+      background:#fff;
+      border-radius:12px;
+      padding:14px 14px 14px 16px;
+      border:1px solid var(--border);
+      box-shadow:0 8px 20px rgba(15,46,20,.04);
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      transition:transform .18s ease, box-shadow .18s ease;
+    }
+    .card-soft:hover,.announcement-card:hover{ transform:translateY(-2px); box-shadow:0 12px 24px rgba(15,46,20,.1); }
+    .quote-avatar{
+      width:100%;
+      height:180px;
+      object-fit:cover;
+      object-position:center 30%;
+      border-radius:10px;
+      border:1px solid rgba(15,23,42,.08);
+      background:#f8fafc;
+    }
+    .quote-avatar.pos-left-face{ object-position: 42% 22%; }
+    .quote-avatar.pos-center-face{ object-position: 50% 20%; }
+    .quote-avatar.pos-right-face{ object-position: 55% 18%; }
+    .quote-text{
+      color:#334155;
+      line-height:1.55;
+      margin:0;
+    }
+    .announcement-card{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:14px;
+      height:100%;
+      box-shadow:0 8px 20px rgba(15,46,20,.04);
+      display:flex;
+      flex-direction:column;
+    }
+    .announcement-meta{
+      font-size:.82rem;
+      color:#64748b;
+      margin-bottom:6px;
+    }
+    .announcement-title{
+      font-weight:800; line-height:1.35; min-height:44px;
+    }
+    .announcement-summary{
+      color:#475569; line-height:1.6; min-height:72px;
+    }
+    .announcement-btn{
+      margin-top:auto;
+      width:max-content;
+      border-radius:999px;
+      padding:6px 14px;
+      font-weight:600;
+    }
+    .section-bg{
+      background:linear-gradient(180deg,#f8fcf9,#edf7ef);
+      border-top:1px solid var(--border);
+      border-bottom:1px solid var(--border);
+    }
+    .news-showcase{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:20px;
+      padding:20px 20px 18px;
+      box-shadow:0 10px 30px rgba(15,46,20,.07);
+    }
+    .headline-title{
+      font-weight:900;
+      letter-spacing:-.2px;
+      margin-bottom:14px;
+      font-size:2.55rem;
+      line-height:1.15;
+      color:#14532d;
+    }
+    .headline-link{
+      display:inline-flex;
+      align-items:center;
+      gap:10px;
+      color:#111827;
+      text-decoration:none;
+      font-weight:700;
+      line-height:1.25;
+      max-width:250px;
+      text-align:left;
+    }
+    .headline-link:hover{ color:#166534; }
+    .headline-link-dot{
+      width:24px; height:24px; border-radius:999px;
+      background:#15803d; color:#fff; display:inline-flex;
+      align-items:center; justify-content:center; font-size:.95rem;
+      flex:0 0 auto;
+    }
+    .main-news-image{
+      width:100%;
+      height:310px;
+      object-fit:cover;
+      border-radius:12px;
+      border:1px solid rgba(15,23,42,.08);
+    }
+    .news-detail-card .main-news-image{
+      height:auto;
+      max-height:420px;
+      object-fit:contain;
+      background:#f8fafc;
+    }
+    .main-news-title{
+      font-size:2rem;
+      line-height:1.3;
+      font-weight:800;
+      color:#0f172a;
+      text-decoration:none;
+      display:block;
+      margin-top:12px;
+    }
+    .main-news-title:hover{ color:#166534; }
+    .side-news-list{
+      display:flex; flex-direction:column; gap:14px;
+    }
+    .side-news-item{
+      display:grid;
+      grid-template-columns:112px 1fr;
+      gap:12px;
+      align-items:start;
+      text-decoration:none;
+      color:inherit;
+      padding:6px 0 14px;
+      border-bottom:1px solid #e5e7eb;
+    }
+    .side-news-item:last-child{ border-bottom:0; padding-bottom:0; }
+    .side-news-thumb{
+      width:112px;
+      height:74px;
+      object-fit:cover;
+      border-radius:10px;
+      border:1px solid rgba(15,23,42,.08);
+      background:#f1f5f9;
+    }
+    .side-news-title{
+      font-weight:700;
+      line-height:1.35;
+      color:#0f172a;
+      margin:0;
+      font-size:1.08rem;
+    }
+    .side-news-item:hover .side-news-title{ color:#166534; }
+    .tech-scroll{
+      display:flex;
+      gap:18px;
+      overflow-x:auto;
+      padding-bottom:14px;
+      scroll-snap-type:x proximity;
+      margin:-6px 0 0;
+      padding:8px 0 14px;
+    }
+    .tech-scroll::-webkit-scrollbar{
+      height:10px;
+    }
+    .tech-scroll::-webkit-scrollbar-thumb{
+      background:rgba(15,23,42,.18);
+      border-radius:999px;
+    }
+    .tech-card{
+      flex:0 0 320px;
+      min-width:320px;
+      scroll-snap-align:start;
+    }
+    .tech-card .card-soft{
+      height:100%;
+    }
+    .event-grid-card{
+      background:#fff;
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      box-shadow:0 8px 20px rgba(15,46,20,.05);
+      height:100%;
+      display:flex;
+      flex-direction:column;
+      transition:transform .16s ease, box-shadow .16s ease;
+      cursor:pointer;
+    }
+    .news-detail-modal{
+      position:fixed;
+      inset:0;
+      z-index:1100;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding:20px;
+      background:rgba(15,23,42,.25);
+      overflow:auto;
+    }
+    .news-detail-modal.show{
+      display:flex;
+    }
+    .news-detail-backdrop{
+      position:absolute;
+      inset:0;
+      background:rgba(15,23,42,.82);
+    }
+    .news-detail-card{
+      position:relative;
+      width:100%;
+      max-width:980px;
+      max-height:calc(100vh - 40px);
+      overflow:hidden;
+      background:#fff;
+      border-radius:20px;
+      box-shadow:0 20px 60px rgba(15,46,20,.22);
+      display:flex;
+      flex-direction:column;
+    }
+    .news-detail-header{
+      padding:24px 24px 0;
+    }
+    .news-detail-body{
+      overflow:auto;
+      padding:0 24px 24px;
+    }
+    .news-detail-close{
+      position:absolute;
+      top:18px;
+      right:18px;
+      z-index:2;
+    }
+    .event-grid-card:hover{
+      transform:translateY(-2px);
+      box-shadow:0 12px 24px rgba(15,46,20,.1);
+    }
+    .event-grid-image{
+      width:100%;
+      height:190px;
+      object-fit:cover;
+    }
+    .event-date-badge{
+      display:inline-block;
+      background:#15803d;
+      color:#fff;
+      border-radius:6px 0 6px 0;
+      padding:3px 10px;
+      font-size:.78rem;
+      font-weight:700;
+      margin:-12px 0 8px 12px;
+      width:max-content;
+      position:relative;
+      z-index:2;
+    }
+    .event-title{
+      font-size:1.06rem;
+      font-weight:700;
+      line-height:1.45;
+      color:#1f2937;
+      text-decoration:none;
+    }
+    @media (max-width: 991.98px){
+      .main-news-image{ height:240px; }
+      .main-news-title{ font-size:1.45rem; }
+      .headline-title{ font-size:2.05rem; }
+    }
+    footer.site-footer{
+      background: linear-gradient(180deg, #1b4332, #0d2818);
+      color: #e8f5e9;
+      padding: 48px 0 24px;
+      margin-top: 20px;
+    }
+    footer.site-footer a{ color: #c8e6c9; text-decoration: none; }
+    footer.site-footer a:hover{ text-decoration: underline; color: #fff; }
+    .footer-bottom{
+      border-top: 1px solid rgba(255,255,255,.12);
+      margin-top: 28px; padding-top: 18px;
+      font-size: .85rem; color: rgba(232,245,233,.75);
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-blur sticky-top">
+    <div class="container py-1">
+      <a class="navbar-brand brand-badge" href="{% url 'home' %}">
+        <img src="{% static 'img/logo-dtnmt.png' %}" alt="Logo">
+        <span class="brand-title">Hệ thống Quản lý Cơ sở hạ tầng - WebGIS</span>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navMain">
+        <ul class="navbar-nav ms-auto align-items-lg-center gap-lg-1">
+          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}">Trang chủ</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#tinh-nang">Tính năng</a></li>
+          <li class="nav-item"><a class="nav-link active" href="{% url 'about_school' %}">Giới thiệu</a></li>
+          <li class="nav-item"><a class="nav-link" href="{% url 'home' %}#tong-quan">Tổng quan</a></li>
+          {% if user.is_authenticated %}
+            <li class="nav-item"><a class="nav-link" href="{% url 'map_view' %}">Bản đồ</a></li>
+            {% if is_admin %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'admin_dashboard' %}">Quản trị</a></li>
+            {% endif %}
+            {% if is_facility %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'facility_dashboard' %}">Nhân viên CSVC</a></li>
+            {% endif %}
+            {% if is_teacher %}
+              <li class="nav-item"><a class="nav-link" href="{% url 'teacher_dashboard' %}">Giảng viên</a></li>
+            {% endif %}
+            <li class="nav-item ms-lg-2">
+              <a class="btn btn-outline-success btn-sm" href="{% url 'logout' %}">Đăng xuất</a>
+            </li>
+          {% else %}
+            <li class="nav-item ms-lg-2">
+              <a class="btn btn-success btn-sm" href="{% url 'login' %}">Đăng nhập</a>
+            </li>
+          {% endif %}
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="container">
+      <div class="hero-card">
+        <div class="row g-0">
+          <div class="col-12 col-lg-6">
+            <div class="hero-media">
+              {% if about_hero_section and about_hero_section.background_image %}
+                <img src="{{ about_hero_section.background_image.url }}" alt="{{ about_hero_section.title }}" class="hero-photo-cover">
+              {% else %}
+                <img src="{% static 'img/hcmunre.png' %}" alt="Không gian học tập HCMUNRE" class="hero-photo-cover">
+              {% endif %}
+              <div class="hero-overlay-content">
+                <span class="badge">TRANG GIỚI THIỆU</span>
+                <h2 class="h4 hero-overlay-title">Giới thiệu tổng quan</h2>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="hero-copy">
+              <span class="hero-intro-chip">✨ Chi tiết</span>
+              <h1 class="h2 fw-bold mb-3">
+                {% if about_hero_section %}
+                  {{ about_hero_section.title }}
+                {% else %}
+                  Hệ thống Quản lý Cơ sở hạ tầng Đại học
+                {% endif %}
+              </h1>
+              <p class="text-muted mb-0">
+                {% if about_hero_section %}
+                  {{ about_hero_section.welcome_text|linebreaksbr }}
+                {% else %}
+                  Nền tảng số hóa hỗ trợ theo dõi, vận hành và nâng cấp cơ sở vật chất trong toàn trường theo thời gian thực.
+                {% endif %}
+              </p>
+              <div class="d-flex flex-wrap gap-2 mt-3">
+                <a href="#tam-nhin" class="btn btn-success btn-sm">Hiện đại & Công nghệ</a>
+                <a href="#tin-tuc" class="btn btn-outline-success btn-sm">Xem tin tức</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="section section-bg" id="tam-nhin">
+    <div class="container">
+      <h2 class="section-title">Hiện đại & Công nghệ</h2>
+      <p class="section-sub">Tự động hóa quy trình – Tối ưu nguồn lực – Minh bạch vận hành. Chúng tôi áp dụng những công nghệ mới nhất để đảm bảo cơ sở hạ tầng luôn trong trạng thái sẵn sàng cao nhất, phục vụ cho mục tiêu nghiên cứu và giảng dạy.</p>
+      <div class="tech-scroll">
+        {% for value in about_core_values %}
+          <div class="tech-card">
+            <div class="card-soft">
+              {% if value.image %}
+                <img src="{{ value.image.url }}" alt="{{ value.title }}" class="img-fluid rounded mb-2" style="height:130px; width:100%; object-fit:cover;">
+              {% else %}
+                <div class="rounded mb-2 d-flex align-items-center justify-content-center text-muted" style="height:130px; background:#f1f5f9; border:1px dashed #cbd5e1;">Chưa có ảnh</div>
+              {% endif %}
+              <h3 class="h6 fw-bold mb-2">{{ value.title }}</h3>
+              <p class="small text-muted mb-0">{{ value.description }}</p>
+            </div>
+          </div>
+        {% empty %}
+          <div class="tech-card">
+            <div class="card-soft">
+              <p class="mb-0 text-muted">Chưa có dữ liệu tầm nhìn/sứ mệnh. Quản trị viên có thể thêm mới tại khu quản trị.</p>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="tin-tuc">
+    <div class="container">
+      <div class="news-showcase">
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+          <h2 class="headline-title mb-0">Tin tức &amp; Sự kiện nổi bật</h2>
+          <a href="{% url 'about_updates' %}" class="headline-link">
+            <span>Xem toàn bộ Tin tức &amp; Sự kiện</span>
+            <span class="headline-link-dot">›</span>
+          </a>
+        </div>
+        <div class="row g-3 mt-2">
+          <div class="col-12">
+            <div id="js-news-detail-modal" class="news-detail-modal" aria-hidden="true">
+              <div class="news-detail-backdrop"></div>
+              <div class="news-detail-card">
+                <a href="#" class="btn btn-outline-secondary btn-sm news-detail-close js-about-news-close">Đóng chi tiết</a>
+                <div class="news-detail-header">
+                  <span class="tag js-detail-tag">TIN TỨC</span>
+                  <h2 class="headline-title mb-2 js-news-detail-title" style="font-size:1.8rem;">&nbsp;</h2>
+                  <p class="text-muted mb-1 js-news-detail-date"></p>
+                  <p class="text-muted mb-3 js-news-detail-summary"></p>
+                </div>
+                <img src="" alt="" class="main-news-image mt-3 js-news-detail-image" style="display:none;">
+                <div class="news-detail-body">
+                  <div class="article-meta js-news-detail-meta" style="font-size:.92rem; color:#64748b; margin-bottom:16px;"></div>
+                  <div class="article-content js-news-detail-content" style="color:#334155; white-space:pre-line;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="col-12 col-lg-6">
+            {% if about_latest_news %}
+              <article>
+                {% if about_latest_news.thumbnail %}
+                  <img src="{{ about_latest_news.thumbnail.url }}" alt="{{ about_latest_news.title }}" class="main-news-image">
+                {% else %}
+                  <div class="main-news-image d-flex align-items-center justify-content-center text-muted">Chưa có ảnh</div>
+                {% endif %}
+                <p class="small text-success fw-semibold mb-1 mt-2">TIN TỨC</p>
+                <a href="#" data-news-id="{{ about_latest_news.pk }}" class="main-news-title js-about-news-link">{{ about_latest_news.title }}</a>
+              </article>
+            {% else %}
+              <div class="card-soft">
+                <p class="mb-0 text-muted">Chưa có tin tức mới.</p>
+              </div>
+            {% endif %}
+          </div>
+          <div class="col-12 col-lg-6">
+            <div class="side-news-list">
+              {% for item in about_side_news %}
+                <a href="#" data-news-id="{{ item.pk }}" class="side-news-item js-about-news-link">
+                  {% if item.thumbnail %}
+                    <img src="{{ item.thumbnail.url }}" alt="{{ item.title }}" class="side-news-thumb">
+                  {% else %}
+                    <div class="side-news-thumb d-flex align-items-center justify-content-center text-muted small">No image</div>
+                  {% endif %}
+                  <div>
+                      <p class="small text-success fw-semibold mb-1">TIN TỨC</p>
+                    <p class="side-news-title">{{ item.title|truncatechars:95 }}</p>
+                  </div>
+                </a>
+              {% empty %}
+                <div class="card-soft">
+                  <p class="mb-0 text-muted">Chưa có dữ liệu tin tức phụ.</p>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-3 mt-3">
+          {% for event in about_events %}
+            <div class="col-12 col-md-6 col-lg-4">
+              <article class="event-grid-card js-about-event-link" data-event-id="{{ event.pk }}" tabindex="0">
+                {% if event.image %}
+                  <img src="{{ event.image.url }}" alt="{{ event.title }}" class="event-grid-image">
+                {% else %}
+                  <div class="event-grid-image d-flex align-items-center justify-content-center text-muted">Chưa có ảnh</div>
+                {% endif %}
+                {% if event.event_date %}
+                  <span class="event-date-badge">{{ event.event_date|date:"d-m-y" }}</span>
+                {% endif %}
+                <div class="p-3 pt-0">
+                  <p class="small text-success mb-1">Sự kiện Trường</p>
+                  <div class="event-title">{{ event.title }}</div>
+                </div>
+              </article>
+            </div>
+          {% empty %}
+            <div class="col-12">
+              <div class="card-soft">
+                <p class="mb-0 text-muted">Chưa có sự kiện nổi bật. Quản trị viên có thể thêm sự kiện trong khu quản trị.</p>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var modal = document.getElementById('js-news-detail-modal');
+      var modalTitle = modal.querySelector('.js-news-detail-title');
+      var modalSummary = modal.querySelector('.js-news-detail-summary');
+      var modalContent = modal.querySelector('.js-news-detail-content');
+      var modalImage = modal.querySelector('.js-news-detail-image');
+      var modalMeta = modal.querySelector('.js-news-detail-meta');
+      var modalTag = modal.querySelector('.js-detail-tag');
+      var modalDate = modal.querySelector('.js-news-detail-date');
+      var closeButtons = modal.querySelectorAll('.js-about-news-close');
+      var backdrop = modal.querySelector('.news-detail-backdrop');
+
+      var detailUrlTemplate = "{% url 'about_news_detail' 0 %}".replace('/0/', '/{id}/');
+      var eventDetailUrlTemplate = "{% url 'about_event_detail' 0 %}".replace('/0/', '/{id}/');
+
+      function formatContent(text) {
+        return String(text || '').replace(/\n/g, '<br>');
+      }
+
+      function showModal() {
+        modal.classList.add('show');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function hideModal() {
+        modal.classList.remove('show');
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+      }
+
+      function setModalData(data) {
+        modalTag.textContent = data.type === 'event' ? 'SỰ KIỆN' : 'TIN TỨC';
+        modalTitle.textContent = data.title || '';
+        modalSummary.textContent = data.summary || '';
+        if (data.type === 'event') {
+          modalContent.innerHTML = '';
+          modalContent.style.display = 'none';
+        } else {
+          modalContent.innerHTML = formatContent(data.content || '');
+          modalContent.style.display = 'block';
+        }
+        modalDate.textContent = data.event_date ? 'Ngày sự kiện: ' + data.event_date : '';
+        modalMeta.textContent = data.published_at ? 'Đăng: ' + data.published_at : '';
+        if (data.thumbnail || data.image) {
+          modalImage.src = data.thumbnail || data.image;
+          modalImage.alt = data.title || 'Nội dung chi tiết';
+          modalImage.style.display = 'block';
+        } else {
+          modalImage.style.display = 'none';
+        }
+      }
+
+      closeButtons.forEach(function (button) {
+        button.addEventListener('click', function (event) {
+          event.preventDefault();
+          hideModal();
+        });
+      });
+
+      backdrop.addEventListener('click', hideModal);
+
+      document.querySelectorAll('.js-about-news-link').forEach(function (link) {
+        link.addEventListener('click', function (event) {
+          event.preventDefault();
+          var pk = this.dataset.newsId;
+          if (!pk) {
+            window.location = this.href;
+            return;
+          }
+          fetch(detailUrlTemplate.replace('{id}', pk) + '?ajax=1', {
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+          })
+            .then(function (response) {
+              if (!response.ok) {
+                throw new Error('Network response was not ok');
+              }
+              return response.json();
+            })
+            .then(function (data) {
+              setModalData(data);
+              showModal();
+            })
+            .catch(function () {
+              window.location = detailUrlTemplate.replace('{id}', pk);
+            });
+        });
+      });
+
+      document.querySelectorAll('.js-about-event-link').forEach(function (card) {
+        var clickHandler = function (event) {
+          event.preventDefault();
+          var pk = card.dataset.eventId;
+          if (!pk) {
+            return;
+          }
+          fetch(eventDetailUrlTemplate.replace('{id}', pk) + '?ajax=1', {
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+            },
+          })
+            .then(function (response) {
+              if (!response.ok) {
+                throw new Error('Network response was not ok');
+              }
+              return response.json();
+            })
+            .then(function (data) {
+              setModalData(data);
+              showModal();
+            })
+            .catch(function () {
+              window.location = eventDetailUrlTemplate.replace('{id}', pk);
+            });
+        };
+
+        card.addEventListener('click', clickHandler);
+        card.addEventListener('keydown', function (event) {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            clickHandler(event);
+          }
+        });
+      });
+    });
+  </script>
+  <footer class="site-footer">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-12 col-lg-4">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <img src="{% static 'img/logo-dtnmt.png' %}" alt="" width="40" height="40" class="rounded-3 bg-white p-1">
+            <span class="fw-bold fs-5">Hệ thống quản lý CSVC</span>
+          </div>
+          <p class="small" style="color: rgba(232,245,233,.85);">
+            Nền tảng số hoá cơ sở vật chất — hướng tới môi trường học tập an toàn, minh bạch và hiệu quả.
+          </p>
+        </div>
+        <div class="col-6 col-lg-2">
+          <div class="fw-bold mb-2">Chức năng</div>
+          <ul class="list-unstyled small">
+            <li class="mb-1"><a href="{% url 'home' %}#tong-quan">Tổng quan CSVC</a></li>
+            <li class="mb-1"><a href="{% url 'home' %}">Tra cứu phòng</a></li>
+            {% if user.is_authenticated %}<li class="mb-1"><a href="{% url 'map_view' %}">Bản đồ</a></li>{% endif %}
+            <li class="mb-1"><a href="{% url 'about_school' %}">Giới thiệu</a></li>
+          </ul>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="fw-bold mb-2">Danh mục</div>
+          <ul class="list-unstyled small">
+            <li class="mb-1">Phòng học &amp; lab</li>
+            <li class="mb-1">Thiết bị</li>
+            <li class="mb-1">Cây xanh</li>
+            <li class="mb-1">Bảo trì &amp; sự cố</li>
+          </ul>
+        </div>
+        <div class="col-12 col-lg-3">
+          <div class="fw-bold mb-2">Liên hệ</div>
+          <ul class="list-unstyled small" style="color: rgba(232,245,233,.9);">
+            <li class="mb-2">📍 236B Lê Văn Sỹ, Phường Tân Sơn Hòa, TP.HCM</li>
+            <li class="mb-2">📞 (028) 3844 3006</li>
+            <li class="mb-2">✉️ <a href="mailto:info@hcmunre.edu.vn">info@hcmunre.edu.vn</a></li>
+            <li>🌐 <a href="https://hcmunre.edu.vn/" target="_blank" rel="noopener">hcmunre.edu.vn</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom d-flex flex-wrap justify-content-between gap-2">
+        <span>© {% now "Y" %} — Phòng Quản trị Cơ sở Vật chất. Bảo lưu mọi quyền.</span>
+        <span>Hệ thống Quản lý Cơ sở hạ tầng - WebGIS</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

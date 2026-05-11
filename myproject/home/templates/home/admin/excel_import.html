@@ -1,0 +1,90 @@
+{% extends "home/admin_base.html" %}
+
+{% block title %}Nhập dữ liệu Excel{% endblock %}
+
+{% block extra_head %}
+<style>
+  .excel-import-card,
+  .excel-import-card .table,
+  .excel-import-card .form-label,
+  .excel-import-card .text-muted,
+  .excel-import-card h5,
+  .excel-import-card h6,
+  .excel-import-card small {
+    color: #000 !important;
+  }
+  .excel-import-card .btn-admin-primary {
+    color: #000 !important;
+  }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+  <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> / Nhập dữ liệu Excel
+{% endblock %}
+
+{% block content %}
+<div class="card card-admin mb-4 excel-import-card">
+  <div class="card-admin-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+      <h5 class="mb-0">Nhập dữ liệu Excel</h5>
+      <small class="d-block mt-1">Hỗ trợ thêm mới cho 4 bảng: sự cố, thiết bị, cây xanh, bảo trì.</small>
+    </div>
+  </div>
+  <div class="card-body">
+    <form method="post" enctype="multipart/form-data" class="row g-3">
+      {% csrf_token %}
+      <div class="col-md-4">
+        <label class="form-label">Bảng dữ liệu</label>
+        <select class="form-select" name="table" required>
+          {% for key, label in table_labels.items %}
+          <option value="{{ key }}" {% if selected_table == key %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Tệp Excel (.xlsx)</label>
+        <input type="file" class="form-control" name="excel_file" accept=".xlsx" required>
+      </div>
+      <div class="col-12">
+        <button type="submit" class="btn btn-admin-primary">Nhập dữ liệu</button>
+        <a href="{% url 'admin_excel_import_template' %}" class="btn btn-outline-dark ms-2">Tải file mẫu 4 sheet</a>
+      </div>
+    </form>
+
+    <hr>
+    <p class="mb-2"><strong>Lưu ý nhập nhanh:</strong></p>
+    <ul class="mb-3">
+      <li><code>tree.university_branch_id</code>: nhập được cả ID hoặc tên chi nhánh (ví dụ: Cơ sở Lê Văn Sỹ).</li>
+      <li><code>tree.lat/lng</code>: có thể để trống cả hai để bổ sung sau.</li>
+      <li><code>equipment.room_id</code>: nhập ID phòng hoặc tên phòng duy nhất (ví dụ: Phòng Lab 501).</li>
+      <li><code>incident.equipment_code</code>: nhập mã thiết bị để tự điền asset + phòng/tầng/tòa nhà.</li>
+      <li><code>maintenance.asset_id</code>: nhập được ID asset, mã thiết bị, tên thiết bị hoặc mã cây.</li>
+      <li><code>maintenance.staff_id</code>: nhập được ID, username hoặc email nhân viên kỹ thuật.</li>
+      <li><code>maintenance.maintenance_type</code>: chấp nhận repair/inspection/trim/replace hoặc tiếng Việt tương đương.</li>
+    </ul>
+    <h6>Cột yêu cầu cho từng bảng</h6>
+    <p class="text-muted small mb-2">Tệp phải có đúng tên cột như bên dưới (dòng tiêu đề ở dòng 1).</p>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 180px;">Bảng</th>
+            <th>Cột trong Excel</th>
+            <th style="width: 280px;">Cột bắt buộc (không null)</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for table_name, cfg in table_config.items %}
+          <tr {% if selected_table == table_name %}class="table-success"{% endif %}>
+            <td><code>{{ table_name }}</code></td>
+            <td><code>{{ cfg.columns|join:", " }}</code></td>
+            <td><code>{{ cfg.required|join:", " }}</code></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -2,6 +2,18 @@
 
 {% block title %}Quản lý loại sự cố{% endblock %}
 
+{% block extra_head %}
+<style>
+  .inline-detail-row td { background: #f8fbf8; border-top: 0; }
+  .inline-detail-box {
+    border-left: 3px solid #43a047;
+    padding: .6rem .8rem;
+    font-size: .92rem;
+    color: #2f3b2f;
+  }
+</style>
+{% endblock %}
+
 {% block breadcrumbs %}
   <a href="{% url 'admin_dashboard' %}">Trang quản trị</a> / Loại sự cố
 {% endblock %}
@@ -16,6 +28,19 @@
     <a href="{% url 'admin_incident_type_add' %}" class="btn btn-light btn-sm">+ Thêm loại sự cố</a>
   </div>
   <div class="card-body">
+    <form method="get" class="row g-2 mb-3">
+      <div class="col-md-10">
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Tìm theo mã, tên, mô tả loại sự cố...">
+      </div>
+      <div class="col-md-2 d-grid">
+        <button class="btn btn-admin-primary" type="submit">Tìm</button>
+      </div>
+      {% if q %}
+      <div class="col-md-12">
+        <a class="btn btn-link p-0 text-decoration-none" href="{% url 'admin_incident_type_list' %}">↺ Quay lại danh sách ban đầu</a>
+      </div>
+      {% endif %}
+    </form>
     <form method="post">
       {% csrf_token %}
       <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
@@ -32,7 +57,8 @@
             <th style="width: 32px;"><input type="checkbox" data-admin-select-all></th>
             <th>Mã</th>
             <th>Tên</th>
-            <th>Mức độ mặc định</th>
+            <th>Áp dụng cho</th>
+            <th class="text-center">Mức độ mặc định</th>
             <th class="text-end">Thao tác</th>
           </tr>
         </thead>
@@ -42,14 +68,24 @@
             <td><input type="checkbox" name="_selected_action" value="{{ it.pk }}"></td>
             <td>{{ it.code }}</td>
             <td>{{ it.name }}</td>
-            <td>{{ it.default_severity }}</td>
+            <td>{{ it.applies_to_labels }}</td>
+            <td class="text-center">{{ it.default_severity }}</td>
             <td class="text-end">
+              <button type="button" class="btn btn-outline-secondary btn-sm" data-toggle-detail="incident-type-{{ it.pk }}">Xem</button>
               <a href="{% url 'admin_incident_type_edit' it.pk %}" class="btn btn-outline-success btn-sm">Sửa</a>
               <a href="{% url 'admin_incident_type_delete' it.pk %}" class="btn btn-outline-danger btn-sm">Xóa</a>
             </td>
           </tr>
+          <tr id="incident-type-{{ it.pk }}" class="inline-detail-row d-none">
+            <td></td>
+            <td colspan="5">
+              <div class="inline-detail-box">
+                <div><strong>Mô tả:</strong> {{ it.description|default:"" }}</div>
+              </div>
+            </td>
+          </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-center text-muted">Chưa có loại sự cố nào.</td></tr>
+          <tr><td colspan="6" class="text-center text-muted">Chưa có loại sự cố nào.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -57,11 +93,28 @@
     </form>
     {% if is_paginated %}
     <nav class="mt-3"><ul class="pagination pagination-sm mb-0">
-      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">«</a></li>{% endif %}
+      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ q }}">«</a></li>{% endif %}
       <li class="page-item disabled"><span class="page-link">Trang {{ page_obj.number }}/{{ page_obj.paginator.num_pages }}</span></li>
-      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">»</a></li>{% endif %}
+      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ q }}">»</a></li>{% endif %}
     </ul></nav>
     {% endif %}
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('[data-toggle-detail]').forEach(function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var id = btn.getAttribute('data-toggle-detail');
+        var row = document.getElementById(id);
+        if (!row) return;
+        row.classList.toggle('d-none');
+      });
+    });
+  });
+</script>
 {% endblock %}

@@ -1,34 +1,25 @@
-from django.db import models
-from django.contrib.auth.hashers import make_password
+from django.contrib.gis.db import models
 
 
 class Role(models.Model):
-    name = models.CharField(max_length=50, unique=True)
+    name = models.TextField(unique=True)
+
+    class Meta:
+        db_table = "role"
 
     def __str__(self):
         return self.name
 
-
 class AppUser(models.Model):
-    username = models.CharField(max_length=150, unique=True)
-    password = models.TextField()
-    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True)
+    email = models.TextField(unique=True)
+    username = models.TextField(unique=True, null=True, blank=True)
+    password = models.TextField(blank=True, null=True)
+    must_change_password = models.BooleanField(default=False)
+    university_branch = models.ForeignKey("UniversityBranch", on_delete=models.SET_NULL, null=True, blank=True)
+    role = models.ForeignKey(Role, on_delete=models.SET_NULL, null=True, blank=True)
 
-    def save(self, *args, **kwargs):
-        """
-        Tự động mã hóa mật khẩu nếu đang ở dạng plain-text.
-
-        - Nếu mật khẩu đã được Django hash (bắt đầu bằng tên thuật toán như 'pbkdf2_', 'argon2', 'bcrypt')
-          thì giữ nguyên.
-        - Nếu là chuỗi plain-text thì dùng make_password để mã hóa trước khi lưu.
-        """
-        if self.password and not (
-            self.password.startswith("pbkdf2_")
-            or self.password.startswith("argon2")
-            or self.password.startswith("bcrypt")
-        ):
-            self.password = make_password(self.password)
-        super().save(*args, **kwargs)
+    class Meta:
+        db_table = "app_user"
 
     def __str__(self):
         return self.username

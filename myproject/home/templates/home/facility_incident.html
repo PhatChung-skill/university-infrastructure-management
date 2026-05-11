@@ -50,6 +50,48 @@
       background: linear-gradient(135deg, #1b5e20, #2e7d32);
       border-color: #1b5e20;
     }
+    @media (max-width: 767.98px) {
+      .navbar-csvc {
+        margin-bottom: .75rem !important;
+      }
+      .navbar-csvc .container-fluid {
+        padding-left: .75rem;
+        padding-right: .75rem;
+      }
+      .navbar-csvc .navbar-brand {
+        max-width: 68vw;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .card-csvc {
+        border-radius: 12px;
+      }
+      .card-csvc-header {
+        border-radius: 12px 12px 0 0;
+        padding: .85rem 1rem;
+      }
+      .card-body.p-4 {
+        padding: 1rem !important;
+      }
+      .table-responsive {
+        border: 1px solid rgba(46, 125, 50, .14);
+        border-radius: 10px;
+      }
+      .table {
+        min-width: 640px;
+      }
+      .form-control,
+      .form-select {
+        font-size: 16px;
+      }
+      .d-flex.justify-content-end {
+        justify-content: stretch !important;
+      }
+      .d-flex.justify-content-end .btn {
+        width: 100%;
+      }
+    }
   </style>
 </head>
 <body>
@@ -98,7 +140,11 @@
         <div class="card card-csvc mb-4">
           <div class="card-csvc-header">
             <h5 class="mb-0">Báo cáo sự cố hạ tầng</h5>
-            <small class="d-block mt-1">Chọn tài sản gặp sự cố, loại sự cố, mức độ ưu tiên và mô tả chi tiết.</small>
+            <small class="d-block mt-1">
+              Chọn <strong>tài sản</strong> (thiết bị / cây) gặp sự cố — vị trí trên bản đồ và liên kết phòng–tầng–tòa
+              được hệ thống lấy tự động từ tài sản đó, không cần khai báo thêm trên map.
+              <span class="d-block mt-1">Loại sự cố sẽ chỉ hiện đúng nhóm: <strong>thiết bị + an ninh</strong> hoặc <strong>cây xanh + an ninh</strong> tùy tài sản.</span>
+            </small>
           </div>
           <div class="card-body p-4">
             {% if messages %}
@@ -113,6 +159,9 @@
               <div class="mb-3">
                 <label class="form-label">{{ form.asset.label }}</label>
                 {{ form.asset }}
+                {% if form.asset.help_text %}
+                  <div class="form-text">{{ form.asset.help_text }}</div>
+                {% endif %}
                 {% for error in form.asset.errors %}
                   <div class="text-danger small">{{ error }}</div>
                 {% endfor %}
@@ -122,6 +171,9 @@
                 <div class="col-md-6 mb-3">
                   <label class="form-label">{{ form.incident_type.label }}</label>
                   {{ form.incident_type }}
+                  {% if form.incident_type.help_text %}
+                    <div class="form-text">{{ form.incident_type.help_text }}</div>
+                  {% endif %}
                   {% for error in form.incident_type.errors %}
                     <div class="text-danger small">{{ error }}</div>
                   {% endfor %}
@@ -201,6 +253,42 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function () {
+      var assetSelect = document.getElementById("id_asset");
+      var incidentTypeSelect = document.getElementById("id_incident_type");
+      if (!assetSelect || !incidentTypeSelect) return;
+
+      var assetMeta = {{ facility_assets_meta_json|safe }};
+      var incidentTypeMeta = {{ facility_incident_types_meta_json|safe }};
+
+      function contextsForAsset() {
+        var id = assetSelect.value;
+        var t = assetMeta[id] || "";
+        if (t === "equipment") return ["equipment", "security"];
+        if (t === "tree") return ["tree", "security"];
+        return [];
+      }
+
+      function filterIncidentTypes() {
+        var ctx = contextsForAsset();
+        Array.prototype.forEach.call(incidentTypeSelect.options, function (opt) {
+          if (!opt.value) return;
+          var applies = incidentTypeMeta[opt.value] || [];
+          if (!Array.isArray(applies)) applies = [applies];
+          var ok = ctx.length > 0 && applies.some(function (v) { return ctx.indexOf(v) >= 0; });
+          opt.hidden = !ok;
+          opt.disabled = !ok;
+          if (!ok && incidentTypeSelect.value === opt.value) {
+            incidentTypeSelect.value = "";
+          }
+        });
+      }
+
+      assetSelect.addEventListener("change", filterIncidentTypes);
+      filterIncidentTypes();
+    })();
+  </script>
 </body>
 </html>
 

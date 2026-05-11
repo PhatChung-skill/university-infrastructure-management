@@ -7,9 +7,12 @@
   <title>{% block title %}Quản trị CSHT{% endblock %}</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
+    html,
     body {
       background: linear-gradient(135deg, #e8f5e9, #f1f8e9);
       min-height: 100vh;
+      max-width: 100%;
+      overflow-x: hidden;
     }
     .navbar-admin {
       background-color: #2e7d32;
@@ -30,6 +33,10 @@
     .navbar-admin .dropdown-menu .dropdown-item:active {
       background-color: #2e7d32;
       color: #fff;
+    }
+    .navbar-admin .container-fluid,
+    .navbar-admin .navbar-collapse{
+      min-width: 0;
     }
     .card-admin {
       border: none;
@@ -62,6 +69,14 @@
       gap: 16px;
       align-items: start;
     }
+    .admin-shell > aside,
+    .admin-shell > section{
+      min-width: 0; /* prevent CSS grid children from forcing page horizontal overflow */
+    }
+    .card-admin,
+    .card-admin .card-body{
+      min-width: 0;
+    }
     @media (max-width: 992px){
       .admin-shell{ grid-template-columns: 1fr; }
     }
@@ -86,6 +101,106 @@
     .admin-breadcrumb{
       font-size: .9rem;
       color: #2e7d32;
+      display: none;
+    }
+    /* Global table polish for admin list pages */
+    .table thead th {
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .table tbody td {
+      vertical-align: middle;
+    }
+    .table thead th:last-child,
+    .table tbody td:last-child {
+      text-align: center !important;
+      white-space: nowrap;
+    }
+    .table tbody td:last-child .btn {
+      min-width: 52px;
+      margin: 0 .15rem;
+    }
+    /* Keep list pages visually stable when paginating */
+    .card-admin .card-body .table-responsive {
+      min-height: 320px;
+      max-width: 100%;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .admin-mobile-nav-toggle {
+      display: none;
+    }
+    @media (max-width: 992px){
+      .admin-sidenav{
+        position: static;
+        top: auto;
+        margin-bottom: 12px;
+      }
+      .admin-mobile-nav-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .admin-breadcrumb{
+        display: block;
+      }
+    }
+    @media (max-width: 767.98px){
+      .navbar-admin{
+        margin-bottom: .75rem !important;
+      }
+      .navbar-admin .container-fluid{
+        padding-left: .75rem;
+        padding-right: .75rem;
+      }
+      .navbar-admin .navbar-brand{
+        max-width: 60vw;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .card-admin{
+        border-radius: 12px;
+      }
+      .card-admin-header{
+        padding: .85rem 1rem;
+        border-radius: 12px 12px 0 0;
+      }
+      .btn-admin-primary{
+        width: 100%;
+      }
+      .table-responsive{
+        border: 1px solid rgba(46,125,50,.14);
+        border-radius: 10px;
+        max-width: 100%;
+      }
+      .table{
+        min-width: 640px;
+      }
+      .table td .btn,
+      .table td .btn-group{
+        white-space: nowrap;
+      }
+      .admin-sidenav .list-group-item{
+        margin-bottom: 6px;
+        padding: .55rem .75rem;
+        font-size: .92rem;
+      }
+      .admin-breadcrumb{
+        font-size: .82rem;
+        margin-bottom: .6rem !important;
+      }
+      .form-control,
+      .form-select{
+        font-size: 16px;
+      }
+      .container,
+      .container-fluid{
+        --bs-gutter-x: 1rem;
+      }
+      .admin-shell{
+        gap: 10px;
+      }
     }
   </style>
   {% block extra_head %}{% endblock %}
@@ -106,10 +221,15 @@
             <a class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}"
                href="{% url 'admin_dashboard' %}">Trang tổng quan</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'admin_about_manage' or 'admin_about_hero' in request.resolver_match.url_name or 'admin_about_core_value' in request.resolver_match.url_name or 'admin_about_announcement' in request.resolver_match.url_name or 'admin_about_event' in request.resolver_match.url_name %}active{% endif %}"
+               href="{% url 'admin_about_manage' %}">Quản lý trang giới thiệu</a>
+          </li>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle {% if 'admin_building' in request.resolver_match.url_name or 'admin_floor' in request.resolver_match.url_name or 'admin_room' in request.resolver_match.url_name or 'admin_tree' in request.resolver_match.url_name or 'admin_equipment' in request.resolver_match.url_name or 'admin_incident' in request.resolver_match.url_name %}active{% endif %}"
+            <a class="nav-link dropdown-toggle {% if 'admin_branch' in request.resolver_match.url_name or 'admin_building' in request.resolver_match.url_name or 'admin_floor' in request.resolver_match.url_name or 'admin_room' in request.resolver_match.url_name or 'admin_tree' in request.resolver_match.url_name or 'admin_equipment' in request.resolver_match.url_name or 'admin_incident' in request.resolver_match.url_name %}active{% endif %}"
                href="#" id="dataDropdown" role="button" data-bs-toggle="dropdown">Dữ liệu hạ tầng</a>
             <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'admin_branch_list' %}">Chi nhánh</a></li>
               <li><a class="dropdown-item" href="{% url 'admin_building_list' %}">Tòa nhà</a></li>
               <li><a class="dropdown-item" href="{% url 'admin_floor_list' %}">Tầng</a></li>
               <li><a class="dropdown-item" href="{% url 'admin_room_list' %}">Phòng</a></li>
@@ -132,6 +252,9 @@
           <li class="nav-item">
             <a class="nav-link" href="{% url 'map_view' %}">Bản đồ</a>
           </li>
+          <li class="nav-item">
+            <a class="nav-link {% if request.resolver_match.url_name == 'admin_excel_import' %}active{% endif %}" href="{% url 'admin_excel_import' %}">Nhập Excel</a>
+          </li>
         </ul>
         <span class="navbar-text me-3">{{ request.user.username }}</span>
         <a class="btn btn-sm btn-outline-light" href="{% url 'logout' %}">Đăng xuất</a>
@@ -150,20 +273,34 @@
     {% endif %}
     <div class="admin-shell">
       <aside class="admin-sidenav">
+        <button class="btn btn-outline-success btn-sm admin-mobile-nav-toggle mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#adminSidebarLinks" aria-expanded="false" aria-controls="adminSidebarLinks">
+          ☰ Menu quản trị
+        </button>
+        <div class="collapse d-lg-block" id="adminSidebarLinks">
         <div class="list-group">
-          <a class="list-group-item {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}" href="{% url 'admin_dashboard' %}">Trang tổng quan</a>
-          <a class="list-group-item {% if 'admin_building' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_building_list' %}">Tòa nhà</a>
-          <a class="list-group-item {% if 'admin_floor' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_floor_list' %}">Tầng</a>
-          <a class="list-group-item {% if 'admin_room' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_room_list' %}">Phòng</a>
-          <a class="list-group-item {% if 'admin_tree' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_tree_list' %}">Cây xanh</a>
-          <a class="list-group-item {% if 'admin_equipment' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_equipment_list' %}">Thiết bị</a>
-          <a class="list-group-item {% if 'admin_incident_type' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_incident_type_list' %}">Loại sự cố</a>
-          <a class="list-group-item {% if 'admin_incident' in request.resolver_match.url_name and not 'admin_incident_type' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_incident_list' %}">Sự cố</a>
-          <a class="list-group-item {% if 'admin_asset' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_asset_list' %}">Tài sản</a>
-          <a class="list-group-item {% if 'admin_maintenance' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_maintenance_list' %}">Bảo trì</a>
-          <a class="list-group-item {% if 'admin_role' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_role_list' %}">Vai trò</a>
-          <a class="list-group-item {% if 'admin_user' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_user_list' %}">Người dùng</a>
-          <a class="list-group-item" href="{% url 'map_view' %}">Bản đồ</a>
+          {% if request.resolver_match.url_name == 'admin_about_manage' or 'admin_about_hero' in request.resolver_match.url_name or 'admin_about_core_value' in request.resolver_match.url_name or 'admin_about_announcement' in request.resolver_match.url_name or 'admin_about_event' in request.resolver_match.url_name %}
+            <a class="list-group-item {% if 'admin_about_hero' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_about_hero_list' %}">Banner & Lời ngỏ</a>
+            <a class="list-group-item {% if 'admin_about_core_value' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_about_core_value_list' %}">Hiện đại & Công nghệ</a>
+            <a class="list-group-item {% if 'admin_about_announcement' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_about_announcement_list' %}">Tin tức</a>
+            <a class="list-group-item {% if 'admin_about_event' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_about_event_list' %}">Sự kiện nổi bật</a>
+          {% else %}
+            <a class="list-group-item {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}" href="{% url 'admin_dashboard' %}">Trang tổng quan</a>
+            <a class="list-group-item {% if 'admin_branch' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_branch_list' %}">Chi nhánh</a>
+            <a class="list-group-item {% if 'admin_building' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_building_list' %}">Tòa nhà</a>
+            <a class="list-group-item {% if 'admin_floor' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_floor_list' %}">Tầng</a>
+            <a class="list-group-item {% if 'admin_room' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_room_list' %}">Phòng</a>
+            <a class="list-group-item {% if 'admin_tree' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_tree_list' %}">Cây xanh</a>
+            <a class="list-group-item {% if 'admin_equipment' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_equipment_list' %}">Thiết bị</a>
+            <a class="list-group-item {% if 'admin_incident_type' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_incident_type_list' %}">Loại sự cố</a>
+            <a class="list-group-item {% if 'admin_incident' in request.resolver_match.url_name and not 'admin_incident_type' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_incident_list' %}">Sự cố</a>
+            <a class="list-group-item {% if 'admin_asset' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_asset_list' %}">Tài sản</a>
+            <a class="list-group-item {% if 'admin_maintenance' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_maintenance_list' %}">Bảo trì</a>
+            <a class="list-group-item {% if 'admin_role' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_role_list' %}">Vai trò</a>
+            <a class="list-group-item {% if 'admin_user' in request.resolver_match.url_name %}active{% endif %}" href="{% url 'admin_user_list' %}">Người dùng</a>
+            <a class="list-group-item {% if request.resolver_match.url_name == 'admin_excel_import' %}active{% endif %}" href="{% url 'admin_excel_import' %}">Nhập Excel</a>
+            <a class="list-group-item" href="{% url 'map_view' %}">Bản đồ</a>
+          {% endif %}
+        </div>
         </div>
       </aside>
 

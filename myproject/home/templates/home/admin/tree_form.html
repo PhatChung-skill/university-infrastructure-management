@@ -4,7 +4,7 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>#map { width: 100%; height: 360px; border-radius: 12px; border: 1px solid #c8e6c9; }</style>
+<style>#map { width: 100%; height: 480px; min-height: 360px; border-radius: 12px; border: 1px solid #c8e6c9; }</style>
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -61,6 +61,11 @@
             {{ form.note }}
             {% for e in form.note.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
+          <div class="mb-3">
+            <label class="form-label">{{ form.university_branch.label }}</label>
+            {{ form.university_branch }}
+            {% for e in form.university_branch.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
           <hr class="my-4" />
           <div class="row">
             <div class="col-md-4 mb-3">
@@ -104,21 +109,61 @@
   var startLat = latInput && latInput.value ? parseFloat(latInput.value) : null;
   var startLng = lngInput && lngInput.value ? parseFloat(lngInput.value) : null;
 
-  var map = L.map('map').setView(
+  var map = L.map('map', { maxZoom: 22 }).setView(
     (startLat && startLng) ? [startLat, startLng] : defaultCenter,
-    (startLat && startLng) ? 20 : 18
+    21
   );
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxNativeZoom: 20,
+    maxZoom: 22,
+  }).addTo(map);
 
-  // Hiển thị lớp tòa nhà + phòng để đặt vị trí cây chính xác
+  // Hiển thị lớp tòa nhà + cây xanh để đặt vị trí chính xác
   var buildingsData = {{ buildings_json|safe }};
-  var roomsData = {{ rooms_json|safe }};
-  var buildingsLayer = L.geoJSON(buildingsData, {
-    style: { color: "#1565c0", weight: 2, opacity: 1, fillColor: "#42a5f5", fillOpacity: 0.12 }
-  }).addTo(map);
-  var roomsLayer = L.geoJSON(roomsData, {
-    style: { color: "#6a1b9a", weight: 2, opacity: 1, fillColor: "#9b59b6", fillOpacity: 0.20 }
-  }).addTo(map);
+  var treesData = {{ trees_json|safe }};
+  var branchCenters = {{ branch_centers_json|safe }};
+  var buildingsMeta = {{ buildings_meta_json|safe }};
+  var treesMeta = {{ trees_meta_json|safe }};
+  var branchSelect = document.getElementById('id_university_branch');
+  var buildingsLayer = null;
+  var treesLayer = null;
+
+  function renderMapLayersByBranch() {
+    var branchId = branchSelect ? branchSelect.value : '';
+    if (buildingsLayer) map.removeLayer(buildingsLayer);
+    if (treesLayer) map.removeLayer(treesLayer);
+
+    buildingsLayer = L.geoJSON(buildingsData, {
+      filter: function(feature) {
+        if (!branchId) return true;
+        var meta = buildingsMeta[String(feature.id)] || {};
+        return String(meta.branch_id || '') === String(branchId);
+      },
+      style: { color: "#1565c0", weight: 2, opacity: 1, fillColor: "#42a5f5", fillOpacity: 0.12 },
+      onEachFeature: function(feature, layer) {
+        var p = feature.properties || {};
+        layer.bindTooltip("🏢 " + (p.name || "Tòa nhà"), { direction: "top", sticky: true });
+      }
+    }).addTo(map);
+
+    treesLayer = L.geoJSON(treesData, {
+      filter: function(feature) {
+        if (!branchId) return true;
+        var meta = treesMeta[String(feature.id)] || {};
+        return String(meta.branch_id || '') === String(branchId);
+      },
+      pointToLayer: function(feature, latlng) {
+        return L.circleMarker(latlng, { radius: 5, fillColor: "#27ae60", color: "#fff", weight: 1, fillOpacity: 1 });
+      },
+      onEachFeature: function(feature, layer) {
+        var p = feature.properties || {};
+        var title = (p.code ? (p.code + " - ") : "") + (p.species || "Cây xanh");
+        layer.bindTooltip("🌳 " + title, { direction: "top", sticky: true });
+      }
+    }).addTo(map);
+  }
 
   var marker = null;
   function updateInputs(lat, lng) {
@@ -140,12 +185,27 @@
     updateInputs(lat, lng);
   });
 
+  renderMapLayersByBranch();
+
   // Nếu chưa có vị trí cây thì zoom theo khu vực phòng/tòa nhà
   if (!(startLat && startLng)) {
     try {
-      if (roomsLayer.getLayers().length) map.fitBounds(roomsLayer.getBounds(), { padding: [20, 20] });
-      else if (buildingsLayer.getLayers().length) map.fitBounds(buildingsLayer.getBounds(), { padding: [20, 20] });
+      if (buildingsLayer.getLayers().length) {
+        map.fitBounds(buildingsLayer.getBounds(), { padding: [28, 28], maxZoom: 21 });
+      } else if (treesLayer.getLayers().length) {
+        map.fitBounds(treesLayer.getBounds(), { padding: [28, 28], maxZoom: 21 });
+      }
     } catch (e) {}
+  }
+
+  if (branchSelect) {
+    branchSelect.addEventListener('change', function () {
+      renderMapLayersByBranch();
+      var val = branchSelect.value;
+      if (!val || !branchCenters[val]) return;
+      var c = branchCenters[val];
+      map.setView([c[0], c[1]], 19);
+    });
   }
 })();
 </script>

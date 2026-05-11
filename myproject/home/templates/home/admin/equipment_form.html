@@ -4,7 +4,10 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-<style>#map { width: 100%; height: 360px; border-radius: 12px; border: 1px solid #c8e6c9; }</style>
+<style>
+#map { width: 100%; height: 320px; border-radius: 12px; border: 1px solid #c8e6c9; }
+#equipment-indoor-map { width: 100%; height: 300px; border-radius: 12px; border: 1px solid #b2dfdb; display: none; }
+</style>
 {% endblock %}
 
 {% block breadcrumbs %}
@@ -19,7 +22,7 @@
     <div class="card card-admin">
       <div class="card-admin-header">
         <h5 class="mb-0">{% if object %}Sửa thiết bị{% else %}Thêm thiết bị mới{% endif %}</h5>
-        <small class="d-block mt-1">Chọn vị trí trên bản đồ để thiết bị hiển thị đúng vị trí.</small>
+        <small class="d-block mt-1">GPS trên khuôn viên (OSM) + tùy chọn <b>tọa độ trên sơ đồ phòng</b> (pixel, CRS.Simple) khi đã gán phòng — đồng bộ với bản đồ công khai.</small>
       </div>
       <div class="card-body p-4">
         {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
@@ -36,16 +39,31 @@
             </div>
           </div>
           <div class="row">
-            <div class="col-md-4 mb-3">
+            <div class="col-md-3 mb-3">
               <label class="form-label">{{ form.equipment_type.label }}</label>
               {{ form.equipment_type }}{% for e in form.equipment_type.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
             </div>
-            <div class="col-md-4 mb-3">
+            <div class="col-md-3 mb-3">
               <label class="form-label">{{ form.status.label }}</label>
               {{ form.status }}{% for e in form.status.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
             </div>
-            <div class="col-md-4 mb-3">
+            <div class="col-md-3 mb-3">
+              <label class="form-label">{{ form.university_branch.label }}</label>
+              {{ form.university_branch }}{% for e in form.university_branch.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-3 mb-3">
+              <label class="form-label">{{ form.building.label }}</label>
+              {{ form.building }}{% for e in form.building.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">{{ form.floor.label }}</label>
+              {{ form.floor }}{% for e in form.floor.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6 mb-3">
               <label class="form-label">{{ form.room.label }}</label>
+              <input type="text" id="room-filter-input" class="form-control form-control-sm mb-2" placeholder="Tìm nhanh phòng theo tên...">
               {{ form.room }}{% for e in form.room.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
             </div>
           </div>
@@ -59,7 +77,9 @@
               {{ form.last_maintenance }}{% for e in form.last_maintenance.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
             </div>
           </div>
+
           <hr class="my-4" />
+          <h6 class="text-secondary mb-2">Bản đồ khuôn viên</h6>
           <div class="row">
             <div class="col-md-4 mb-3">
               <label class="form-label">{{ form.latitude.label }}</label>
@@ -71,10 +91,20 @@
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label d-block">Chọn vị trí trên bản đồ</label>
+            <label class="form-label d-block">OpenStreetMap (khuôn viên)</label>
             <div id="map"></div>
-            <small class="text-muted d-block mt-1">Nhấn chuột vào bản đồ để đặt vị trí. Kéo marker để chỉnh.</small>
+            <small class="text-muted d-block mt-1">Chọn chi nhánh / tòa / tầng / phòng để map tự zoom đúng ngữ cảnh. Click bản đồ hoặc kéo ghim để đặt GPS (WGS84).</small>
           </div>
+
+          <hr class="my-4" />
+          <h6 class="text-secondary mb-2">Sơ đồ trong phòng (vị trí thiết bị)</h6>
+          <p class="small text-muted mb-2">Khi đã chọn <b>phòng</b>, sơ đồ bên dưới dùng cùng logic với trang bản đồ công khai. Click để đặt hoặc kéo marker; tọa độ lưu dưới dạng pixel trên ảnh sơ đồ.</p>
+          {% for e in form.local_x.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          {% for e in form.local_y.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          {{ form.local_x }}{{ form.local_y }}
+          <div id="equipment-indoor-map"></div>
+          <small id="equipment-indoor-hint" class="text-muted d-block mt-1"></small>
+
           <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
             <a href="{% url 'admin_equipment_list' %}" class="btn btn-outline-secondary">Quay lại danh sách</a>
             <div class="d-flex flex-wrap gap-2 justify-content-end">
@@ -99,80 +129,264 @@
   var lngInput = document.getElementById('id_longitude');
   var startLat = latInput && latInput.value ? parseFloat(latInput.value) : null;
   var startLng = lngInput && lngInput.value ? parseFloat(lngInput.value) : null;
-  var map = L.map('map').setView((startLat && startLng) ? [startLat, startLng] : defaultCenter, (startLat && startLng) ? 20 : 18);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(map);
 
-  // Hiển thị lớp tòa nhà + phòng để đặt vị trí thiết bị chính xác
+  var map = L.map('map', { maxZoom: 22 }).setView(
+    (startLat && startLng) ? [startLat, startLng] : defaultCenter,
+    21
+  );
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains: 'abcd',
+    maxNativeZoom: 20,
+    maxZoom: 22,
+  }).addTo(map);
+
   var buildingsData = {{ buildings_json|safe }};
   var roomsData = {{ rooms_json|safe }};
+  var roomsMeta = {{ rooms_meta_json|safe }};
+  var buildingsMeta = {{ buildings_meta_json|safe }};
+  var floorsMeta = {{ floors_meta_json|safe }};
+  var branchCenters = {{ branch_centers_json|safe }};
+  var branchSelect = document.getElementById('id_university_branch');
+  var buildingSelect = document.getElementById('id_building');
+  var floorSelect = document.getElementById('id_floor');
+  var roomSelect = document.getElementById('id_room');
+  var roomFilterInput = document.getElementById('room-filter-input');
   var marker = null;
-  function updateInputs(lat, lng) { if (latInput) latInput.value = lat.toFixed(6); if (lngInput) lngInput.value = lng.toFixed(6); }
+  function updateGPS(lat, lng) {
+    if (latInput) latInput.value = lat.toFixed(6);
+    if (lngInput) lngInput.value = lng.toFixed(6);
+  }
   function setEquipmentMarker(lat, lng) {
     if (!marker) {
       marker = L.marker([lat, lng], { draggable: true }).addTo(map);
       marker.on('dragend', function(ev) {
         var p = ev.target.getLatLng();
-        updateInputs(p.lat, p.lng);
+        updateGPS(p.lat, p.lng);
       });
     } else {
       marker.setLatLng([lat, lng]);
     }
-    updateInputs(lat, lng);
+    updateGPS(lat, lng);
   }
 
-  var buildingsLayer = L.geoJSON(buildingsData, {
-    style: {
-      color: "#1565c0",
-      weight: 2,
-      opacity: 1,
-      fillColor: "#42a5f5",
-      fillOpacity: 0.12
-    },
-    onEachFeature: function (feature, layer) {
-      var p = feature.properties || {};
-      layer.bindPopup("<b>🏢 " + (p.name || "Tòa nhà") + "</b><br>" + (p.description || ""));
-      layer.on('click', function(e) {
-        // Click trực tiếp tòa nhà => đặt vị trí thiết bị ngay điểm click
-        setEquipmentMarker(e.latlng.lat, e.latlng.lng);
-      });
+  var buildingsLayer = null;
+  var roomsLayer = null;
+  function focusEquipmentMap() {
+    var branchVal = branchSelect ? branchSelect.value : '';
+    if (roomsLayer && roomsLayer.getLayers().length) {
+      map.fitBounds(roomsLayer.getBounds(), { padding: [24, 24], maxZoom: 21 });
+      return;
     }
-  }).addTo(map);
-
-  var roomsLayer = L.geoJSON(roomsData, {
-    style: {
-      color: "#6a1b9a",
-      weight: 2,
-      opacity: 1,
-      fillColor: "#9b59b6",
-      fillOpacity: 0.20
-    },
-    onEachFeature: function (feature, layer) {
-      var p = feature.properties || {};
-      layer.bindPopup("<b>🚪 " + (p.name || "Phòng") + "</b><br>Loại: " + (p.room_type || ""));
-      layer.on('click', function(e) {
-        // Click trực tiếp phòng => đặt vị trí thiết bị ngay điểm click
-        setEquipmentMarker(e.latlng.lat, e.latlng.lng);
-      });
+    if (buildingsLayer && buildingsLayer.getLayers().length) {
+      map.fitBounds(buildingsLayer.getBounds(), { padding: [24, 24], maxZoom: 20 });
+      return;
     }
-  }).addTo(map);
-  if (startLat && startLng) {
-    setEquipmentMarker(startLat, startLng);
+    if (branchVal && branchCenters[branchVal]) {
+      var c = branchCenters[branchVal];
+      map.setView([c[0], c[1]], 19);
+    }
   }
-  map.on('click', function(e) {
-    var lat = e.latlng.lat, lng = e.latlng.lng;
-    setEquipmentMarker(lat, lng);
-  });
+  function renderEquipmentLayers() {
+    var branchVal = branchSelect ? branchSelect.value : '';
+    var buildingVal = buildingSelect ? buildingSelect.value : '';
+    var floorVal = floorSelect ? floorSelect.value : '';
+    var roomVal = roomSelect ? roomSelect.value : '';
 
-  // Nếu chưa có vị trí thiết bị thì zoom theo phòng/tòa nhà để dễ đặt điểm
-  if (!(startLat && startLng)) {
-    try {
-      if (roomsLayer.getLayers().length) {
-        map.fitBounds(roomsLayer.getBounds(), { padding: [20, 20] });
-      } else if (buildingsLayer.getLayers().length) {
-        map.fitBounds(buildingsLayer.getBounds(), { padding: [20, 20] });
+    if (buildingsLayer) map.removeLayer(buildingsLayer);
+    if (roomsLayer) map.removeLayer(roomsLayer);
+
+    buildingsLayer = L.geoJSON(buildingsData, {
+      filter: function(feature) {
+        var bid = String(feature.id);
+        if (buildingVal) return bid === String(buildingVal);
+        var bMeta = buildingsMeta[bid] || {};
+        if (branchVal) return String(bMeta.branch_id || '') === String(branchVal);
+        return true;
+      },
+      style: { color: "#1565c0", weight: 2, opacity: 1, fillColor: "#42a5f5", fillOpacity: 0.12 },
+      onEachFeature: function (feature, layer) {
+        var p = feature.properties || {};
+        layer.bindPopup("<b>🏢 " + (p.name || "Tòa nhà") + "</b><br>" + (p.description || ""));
+        layer.bindTooltip("🏢 " + (p.name || "Tòa nhà"), { direction: "top", sticky: true });
+        layer.on('click', function(e) { setEquipmentMarker(e.latlng.lat, e.latlng.lng); });
       }
-    } catch (e) {}
+    }).addTo(map);
+
+    roomsLayer = L.geoJSON(roomsData, {
+      filter: function(feature) {
+        var rid = String(feature.id);
+        var m = roomsMeta[rid] || {};
+        if (roomVal) return rid === String(roomVal);
+        if (floorVal && String(m.floor_id || '') !== String(floorVal)) return false;
+        if (buildingVal && String(m.building_id || '') !== String(buildingVal)) return false;
+        if (branchVal && String(m.branch_id || '') !== String(branchVal)) return false;
+        return true;
+      },
+      style: { color: "#6a1b9a", weight: 2, opacity: 1, fillColor: "#9b59b6", fillOpacity: 0.20 },
+      onEachFeature: function (feature, layer) {
+        var p = feature.properties || {};
+        layer.bindPopup("<b>🚪 " + (p.name || "Phòng") + "</b><br>Loại: " + (p.room_type || ""));
+        layer.bindTooltip("🚪 " + (p.name || "Phòng"), { direction: "top", sticky: true });
+        layer.on('click', function(e) { setEquipmentMarker(e.latlng.lat, e.latlng.lng); });
+      }
+    }).addTo(map);
   }
+
+  if (startLat && startLng) setEquipmentMarker(startLat, startLng);
+  map.on('click', function(e) { setEquipmentMarker(e.latlng.lat, e.latlng.lng); });
+
+  var equipmentIndoorMap = null;
+  var equipmentIndoorMarker = null;
+  var equipmentIndoorH = 600;
+  var equipmentIndoorW = 800;
+  var localXInput = document.getElementById('id_local_x');
+  var localYInput = document.getElementById('id_local_y');
+  var indoorMapEl = document.getElementById('equipment-indoor-map');
+  var indoorHint = document.getElementById('equipment-indoor-hint');
+  var roomLayoutUrlTpl = "{% url 'map_room_layout' room_id=888888888 %}";
+
+  function roomLayoutApiUrl(rid) {
+    return roomLayoutUrlTpl.replace("888888888", String(rid));
+  }
+
+  function destroyEquipmentIndoorMap() {
+    if (equipmentIndoorMap) {
+      equipmentIndoorMap.remove();
+      equipmentIndoorMap = null;
+    }
+    equipmentIndoorMarker = null;
+  }
+
+  function clampIndoor(n, a, b) {
+    return Math.max(a, Math.min(b, n));
+  }
+
+  function syncIndoorInputsFromLatLng(latlng) {
+    var lx = clampIndoor(latlng.lng, 0, equipmentIndoorW);
+    var ly = clampIndoor(equipmentIndoorH - latlng.lat, 0, equipmentIndoorH);
+    if (localXInput) localXInput.value = String(Math.round(lx * 100) / 100);
+    if (localYInput) localYInput.value = String(Math.round(ly * 100) / 100);
+  }
+
+  function placeIndoorMarkerFromInputs() {
+    if (!equipmentIndoorMap) return;
+    if (!localXInput || !localYInput || localXInput.value === '' || localYInput.value === '') return;
+    var lx = parseFloat(localXInput.value);
+    var ly = parseFloat(localYInput.value);
+    if (isNaN(lx) || isNaN(ly)) return;
+    var plat = equipmentIndoorH - ly;
+    var plng = lx;
+    if (!equipmentIndoorMarker) {
+      equipmentIndoorMarker = L.marker([plat, plng], { draggable: true }).addTo(equipmentIndoorMap);
+      equipmentIndoorMarker.on('dragend', function(ev) {
+        syncIndoorInputsFromLatLng(ev.target.getLatLng());
+      });
+    } else {
+      equipmentIndoorMarker.setLatLng([plat, plng]);
+    }
+  }
+
+  function loadEquipmentIndoorEditor(roomId) {
+    destroyEquipmentIndoorMap();
+    if (!indoorMapEl || !roomId) {
+      if (indoorMapEl) indoorMapEl.style.display = 'none';
+      if (indoorHint) indoorHint.textContent = roomId ? '' : 'Chọn phòng để hiện sơ đồ và đặt vị trí nội bộ (pixel).';
+      return;
+    }
+    if (indoorHint) indoorHint.textContent = 'Đang tải sơ đồ phòng…';
+    indoorMapEl.style.display = 'block';
+    fetch(roomLayoutApiUrl(roomId), { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+      .then(function(r) { if (!r.ok) throw new Error('bad'); return r.json(); })
+      .then(function(data) {
+        var room = data.room || {};
+        equipmentIndoorH = room.blueprint_height || 600;
+        equipmentIndoorW = room.blueprint_width || 800;
+        var bp = room.blueprint_url || '';
+        equipmentIndoorMap = L.map('equipment-indoor-map', { crs: L.CRS.Simple, minZoom: -2, maxZoom: 2 });
+        var bounds = [[0, 0], [equipmentIndoorH, equipmentIndoorW]];
+        if (bp) {
+          L.imageOverlay(bp, bounds).addTo(equipmentIndoorMap);
+        } else {
+          L.rectangle(bounds, { color: '#00695c', weight: 2, fillColor: '#004d40', fillOpacity: 0.92 }).addTo(equipmentIndoorMap);
+        }
+        equipmentIndoorMap.on('click', function(e) {
+          if (!equipmentIndoorMarker) {
+            equipmentIndoorMarker = L.marker(e.latlng, { draggable: true }).addTo(equipmentIndoorMap);
+            equipmentIndoorMarker.on('dragend', function(ev) {
+              syncIndoorInputsFromLatLng(ev.target.getLatLng());
+            });
+          } else {
+            equipmentIndoorMarker.setLatLng(e.latlng);
+          }
+          syncIndoorInputsFromLatLng(e.latlng);
+        });
+        placeIndoorMarkerFromInputs();
+        if (indoorHint) {
+          indoorHint.textContent = 'Phòng: ' + (room.name || '') + ' — click để đặt / kéo ghim để chỉnh (tọa độ px trên sơ đồ).';
+        }
+        equipmentIndoorMap.fitBounds(bounds);
+      })
+      .catch(function() {
+        destroyEquipmentIndoorMap();
+        if (indoorMapEl) indoorMapEl.style.display = 'none';
+        if (indoorHint) indoorHint.textContent = 'Không tải được sơ đồ phòng.';
+      });
+  }
+
+  function applyLocationFilter() {
+    if (!roomSelect || !buildingSelect || !floorSelect) return;
+    var branchVal = branchSelect ? branchSelect.value : '';
+    var buildingVal = buildingSelect ? buildingSelect.value : '';
+    var floorVal = floorSelect ? floorSelect.value : '';
+    var keyword = roomFilterInput && roomFilterInput.value ? roomFilterInput.value.trim().toLowerCase() : '';
+
+    Array.prototype.forEach.call(buildingSelect.options, function(opt) {
+      if (!opt.value) return;
+      var m = buildingsMeta[opt.value];
+      var ok = !branchVal || (m && String(m.branch_id || '') === String(branchVal));
+      opt.hidden = !ok;
+      opt.disabled = !ok;
+      if (!ok && buildingSelect.value === opt.value) buildingSelect.value = '';
+    });
+
+    Array.prototype.forEach.call(floorSelect.options, function(opt) {
+      if (!opt.value) return;
+      var m = floorsMeta[opt.value];
+      var ok = true;
+      if (branchVal && String((m && m.branch_id) || '') !== String(branchVal)) ok = false;
+      if (buildingSelect.value && String((m && m.building_id) || '') !== String(buildingSelect.value)) ok = false;
+      opt.hidden = !ok;
+      opt.disabled = !ok;
+      if (!ok && floorSelect.value === opt.value) floorSelect.value = '';
+    });
+
+    Array.prototype.forEach.call(roomSelect.options, function(opt) {
+      if (!opt.value) return;
+      var m = roomsMeta[opt.value];
+      if (!m) return;
+      var ok = true;
+      if (branchVal && String(m.branch_id || '') !== String(branchVal)) ok = false;
+      if (buildingVal && String(m.building_id || '') !== String(buildingVal)) ok = false;
+      if (floorVal && String(m.floor_id || '') !== String(floorVal)) ok = false;
+      if (keyword && String(m.name || '').toLowerCase().indexOf(keyword) === -1) ok = false;
+      opt.hidden = !ok;
+      opt.disabled = !ok;
+      if (!ok && roomSelect.value === opt.value) roomSelect.value = '';
+    });
+  }
+  function refreshEquipmentMapAndIndoor() {
+    applyLocationFilter();
+    renderEquipmentLayers();
+    focusEquipmentMap();
+    loadEquipmentIndoorEditor(roomSelect && roomSelect.value ? roomSelect.value : '');
+  }
+  [branchSelect, buildingSelect, floorSelect].forEach(function(el) {
+    if (el) el.addEventListener('change', refreshEquipmentMapAndIndoor);
+  });
+  if (roomSelect) roomSelect.addEventListener('change', refreshEquipmentMapAndIndoor);
+  if (roomFilterInput) roomFilterInput.addEventListener('input', refreshEquipmentMapAndIndoor);
+  refreshEquipmentMapAndIndoor();
 })();
 </script>
 {% endblock %}

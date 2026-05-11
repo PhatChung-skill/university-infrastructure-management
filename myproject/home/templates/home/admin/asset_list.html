@@ -31,6 +31,7 @@
           <tr>
             <th style="width: 32px;"><input type="checkbox" data-admin-select-all></th>
             <th>Loại</th>
+            <th>Chi nhánh</th>
             <th>Thiết bị</th>
             <th>Cây xanh</th>
             <th class="text-end">Thao tác</th>
@@ -41,6 +42,7 @@
           <tr>
             <td><input type="checkbox" name="_selected_action" value="{{ a.pk }}"></td>
             <td>{{ a.get_asset_type_display }}</td>
+            <td>{{ a.university_branch|default:"-" }}</td>
             <td>{{ a.equipment|default:"-" }}</td>
             <td>{{ a.tree|default:"-" }}</td>
             <td class="text-end">
@@ -49,7 +51,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-center text-muted">Chưa có tài sản nào.</td></tr>
+          <tr><td colspan="6" class="text-center text-muted">Chưa có tài sản nào.</td></tr>
           {% endfor %}
         </tbody>
       </table>

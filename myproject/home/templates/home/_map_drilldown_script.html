@@ -1,0 +1,2028 @@
+(function () {
+        var map = L.map("map", { maxZoom: 22 }).setView([10.7984, 106.6655], 19);
+        if (map && map.zoomControl) {
+            map.zoomControl.setPosition("bottomright");
+        }
+        var mobileMq = window.matchMedia("(max-width: 980px)");
+        function isMobileViewport() {
+            return !!(mobileMq && mobileMq.matches);
+        }
+        function setPanelMobileOpen(el, open) {
+            if (!el) return;
+            el.classList.toggle("mobile-open", !!open);
+        }
+        function closeAllMobilePanels() {
+            setPanelMobileOpen(document.querySelector(".query-panel"), false);
+            setPanelMobileOpen(document.getElementById("route-panel"), false);
+            setPanelMobileOpen(document.getElementById("map-legend"), false);
+            setPanelMobileOpen(document.getElementById("drill-panel"), false);
+            syncMobileActionStates();
+        }
+        function syncMobileActionStates() {
+            var routeBtn = document.getElementById("mobile-toggle-route");
+            var queryBtn = document.getElementById("mobile-toggle-query");
+            var legendBtn = document.getElementById("mobile-toggle-legend");
+            var routePanel = document.getElementById("route-panel");
+            var queryPanel = document.querySelector(".query-panel");
+            var legendPanel = document.getElementById("map-legend");
+            if (routeBtn && routePanel) routeBtn.classList.toggle("is-active", routePanel.classList.contains("mobile-open"));
+            if (queryBtn && queryPanel) queryBtn.classList.toggle("is-active", queryPanel.classList.contains("mobile-open"));
+            if (legendBtn && legendPanel) legendBtn.classList.toggle("is-active", legendPanel.classList.contains("mobile-open"));
+        }
+        function initMobilePanelToggles() {
+            var routeBtn = document.getElementById("mobile-toggle-route");
+            var queryBtn = document.getElementById("mobile-toggle-query");
+            var legendBtn = document.getElementById("mobile-toggle-legend");
+            var routePanel = document.getElementById("route-panel");
+            var queryPanel = document.querySelector(".query-panel");
+            var legendPanel = document.getElementById("map-legend");
+            function togglePanel(target) {
+                if (!isMobileViewport()) return;
+                [queryPanel, routePanel, legendPanel, document.getElementById("drill-panel")].forEach(function (el) {
+                    if (el && el !== target) setPanelMobileOpen(el, false);
+                });
+                if (target) setPanelMobileOpen(target, !target.classList.contains("mobile-open"));
+                syncMobileActionStates();
+            }
+            if (routeBtn && routePanel) {
+                routeBtn.addEventListener("click", function () {
+                    togglePanel(routePanel);
+                });
+            }
+            if (queryBtn && queryPanel) {
+                queryBtn.addEventListener("click", function () {
+                    togglePanel(queryPanel);
+                });
+            }
+            if (legendBtn && legendPanel) {
+                legendBtn.addEventListener("click", function () {
+                    togglePanel(legendPanel);
+                });
+            }
+            map.on("click", function () {
+                if (isMobileViewport()) closeAllMobilePanels();
+            });
+            map.on("movestart", function () {
+                if (isMobileViewport()) closeAllMobilePanels();
+            });
+            if (mobileMq && mobileMq.addEventListener) {
+                mobileMq.addEventListener("change", function (ev) {
+                    if (!ev.matches) closeAllMobilePanels();
+                });
+            }
+            syncMobileActionStates();
+        }
+        initMobilePanelToggles();
+
+        L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
+            attribution:
+                '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: "abcd",
+            maxNativeZoom: 20,
+            maxZoom: 22,
+        }).addTo(map);
+
+        var hasUrlFocus = false;
+        (function () {
+            var params = new URLSearchParams(window.location.search);
+            var lat = parseFloat(params.get("lat"));
+            var lng = parseFloat(params.get("lng"));
+            var zoom = parseInt(params.get("zoom") || "19", 10);
+            if (!isNaN(lat) && !isNaN(lng)) {
+                map.setView([lat, lng], isNaN(zoom) ? 19 : Math.min(zoom, 22));
+                hasUrlFocus = true;
+            }
+        })();
+
+        var buildingsData = {{ buildings_json|safe }};
+        var treesData = {{ trees_json|safe }};
+        var incidentsData = {{ incidents_json|safe }};
+        var roomsData = {{ rooms_json|safe }};
+        var equipmentData = {{ equipment_json|safe }};
+        var branchesNav = {{ branches_nav_json|safe }};
+
+        var equipmentSearchUrl = "{% url 'map_equipment_search' %}";
+        var dangerousTreesUrl = "{% url 'dangerous_trees' %}";
+        var devicesToCheckUrl = "{% url 'devices_to_check' %}";
+
+        var _API_PLACEHOLDER = "888888888";
+        function apiUrlBuildingFloors(bid) {
+            return "{% url 'map_building_floors' building_id=888888888 %}".replace(_API_PLACEHOLDER, String(bid));
+        }
+        function apiUrlFloorRooms(fid) {
+            return "{% url 'map_floor_rooms' floor_id=888888888 %}".replace(_API_PLACEHOLDER, String(fid));
+        }
+        function apiUrlFloorEquipment(fid) {
+            return "{% url 'map_floor_equipment' floor_id=888888888 %}".replace(_API_PLACEHOLDER, String(fid));
+        }
+        function apiUrlRoomLayout(rid) {
+            return "{% url 'map_room_layout' room_id=888888888 %}".replace(_API_PLACEHOLDER, String(rid));
+        }
+
+        function queryBranchQueryString() {
+            var el = document.getElementById("query-branch-filter");
+            var v = el && el.value ? String(el.value).trim() : "";
+            return v ? "?branch_id=" + encodeURIComponent(v) : "";
+        }
+
+        function queryBranchFilterLabel() {
+            var el = document.getElementById("query-branch-filter");
+            if (!el || !el.value) return "";
+            var opt = el.options[el.selectedIndex];
+            return opt && opt.textContent ? " — " + opt.textContent : "";
+        }
+
+        function populateMapBranchSelects() {
+            if (!Array.isArray(branchesNav)) return;
+            var goSel = document.getElementById("map-branch-go-select");
+            var qSel = document.getElementById("query-branch-filter");
+            var routeSel = document.getElementById("route-branch-select");
+            if (!goSel || !qSel) return;
+            branchesNav.forEach(function (b) {
+                var oGo = document.createElement("option");
+                oGo.value = String(b.id);
+                oGo.textContent = b.name || "Chi nhánh #" + b.id;
+                if (b.lat != null && b.lng != null) {
+                    oGo.setAttribute("data-lat", String(b.lat));
+                    oGo.setAttribute("data-lng", String(b.lng));
+                }
+                goSel.appendChild(oGo);
+                var oQ = document.createElement("option");
+                oQ.value = String(b.id);
+                oQ.textContent = b.name || "Chi nhánh #" + b.id;
+                qSel.appendChild(oQ);
+                if (routeSel) {
+                    var oR = document.createElement("option");
+                    oR.value = String(b.id);
+                    oR.textContent = b.name || "Chi nhánh #" + b.id;
+                    if (b.lat != null && b.lng != null) {
+                        oR.setAttribute("data-lat", String(b.lat));
+                        oR.setAttribute("data-lng", String(b.lng));
+                    }
+                    routeSel.appendChild(oR);
+                }
+            });
+        }
+        populateMapBranchSelects();
+
+        var routeLayer = L.layerGroup().addTo(map);
+        var ROUTE_MODES = [
+            { ui: "driving", osrm: "driving", label: "\u00d4 t\u00f4", color: "#1565c0", avgSpeedKmh: 60 },
+            { ui: "motorcycle", osrm: "motorcycle", label: "Xe máy", color: "#ef6c00", avgSpeedKmh: 50 },
+            { ui: "cycling", osrm: "bike", label: "Xe đạp", color: "#2e7d32", avgSpeedKmh: 20 },
+        ];
+        var routeState = {
+            origin: null,
+            destination: null,
+            originMarker: null,
+            destinationMarker: null,
+            polylineLayers: [],
+            routeRequestId: 0,
+            activeProfile: "driving",
+            waitingPickOrigin: false,
+        };
+
+        function escapeHtmlRoute(s) {
+            if (s == null) return "";
+            var d = document.createElement("div");
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function formatDistance(meters) {
+            var m = Number(meters || 0);
+            if (m >= 1000) return (m / 1000).toFixed(2) + " km";
+            return Math.round(m) + " m";
+        }
+
+        function formatDuration(seconds) {
+            var s = Number(seconds || 0);
+            if (!isFinite(s) || s < 0) s = 0;
+            var h = Math.floor(s / 3600);
+            var m = s / 60;
+            if (h > 0) {
+                var mm = Math.floor((s % 3600) / 60);
+                return h + " gi\u1edd " + mm + " ph\u00fat";
+            }
+            if (m < 1) return "~1 ph\u00fat";
+            if (m < 10) return m.toFixed(1).replace(/\.0$/, "") + " ph\u00fat";
+            return Math.round(m) + " ph\u00fat";
+        }
+
+        function estimateDurationSecondsFromDistance(meters, speedKmh) {
+            var spd = Number(speedKmh);
+            if (!isFinite(spd) || spd <= 0) return 0;
+            var m = Number(meters);
+            if (!isFinite(m) || m <= 0) return 0;
+            return (m / 1000 / spd) * 3600;
+        }
+
+        function setRouteSummary(html) {
+            var el = document.getElementById("route-summary");
+            if (el) el.innerHTML = html;
+        }
+
+        function setMapPickMode(active) {
+            routeState.waitingPickOrigin = !!active;
+            var btn = document.getElementById("btn-route-pick-on-map");
+            if (!btn) return;
+            if (routeState.waitingPickOrigin) {
+                btn.classList.add("btn-route-primary");
+                btn.textContent = "📌 Đang chờ bạn chạm lên bản đồ…";
+            } else {
+                btn.classList.remove("btn-route-primary");
+                btn.textContent = "📌 Ghim điểm bắt đầu trên bản đồ";
+            }
+        }
+
+        function reverseGeocodeLatLng(lat, lng) {
+            var url =
+                "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=" +
+                encodeURIComponent(lat) +
+                "&lon=" +
+                encodeURIComponent(lng) +
+                "&zoom=18&addressdetails=1";
+            return fetch(url, {
+                headers: { Accept: "application/json", "Accept-Language": "vi,en" },
+            })
+                .then(function (r) {
+                    if (!r.ok) throw new Error("reverse_geocode_failed");
+                    return r.json();
+                })
+                .then(function (data) {
+                    return (data && (data.display_name || "")) || "";
+                })
+                .catch(function () {
+                    return "";
+                });
+        }
+
+        function clearRoutePolylines() {
+            routeState.polylineLayers.forEach(function (ly) {
+                if (ly && routeLayer.hasLayer(ly)) routeLayer.removeLayer(ly);
+            });
+            routeState.polylineLayers = [];
+        }
+
+        function clearRouteOnly() {
+            clearRoutePolylines();
+            setRouteSummary("Chưa có lộ trình.");
+        }
+
+        function clearAllRouteState() {
+            routeLayer.clearLayers();
+            routeState.origin = null;
+            routeState.destination = null;
+            routeState.originMarker = null;
+            routeState.destinationMarker = null;
+            routeState.polylineLayers = [];
+            var originConfirm = document.getElementById("route-origin-confirm");
+            if (originConfirm) originConfirm.textContent = "Chưa chọn vị trí bắt đầu.";
+            setRouteSummary("Chưa có lộ trình.");
+        }
+
+        function setRoutePanelVisible(visible) {
+            var el = document.getElementById("route-panel");
+            if (!el) return;
+            el.classList.toggle("route-panel-hidden", !visible);
+            if (!visible) setPanelMobileOpen(el, false);
+            syncMobileActionStates();
+        }
+
+        function setOriginPoint(lat, lng, label, sourceType) {
+            if (routeState.originMarker && routeLayer.hasLayer(routeState.originMarker)) {
+                routeLayer.removeLayer(routeState.originMarker);
+            }
+            routeState.origin = {
+                lat: Number(lat),
+                lng: Number(lng),
+                label: label || "Vị trí bắt đầu",
+                sourceType: sourceType || "manual",
+            };
+            routeState.originMarker = L.marker([routeState.origin.lat, routeState.origin.lng], {
+                title: "Vị trí bắt đầu",
+            })
+                .bindPopup("<b>Điểm bắt đầu</b><br>" + escapeHtmlRoute(routeState.origin.label))
+                .addTo(routeLayer);
+            routeState.originMarker.openPopup();
+            var originConfirm = document.getElementById("route-origin-confirm");
+            if (originConfirm) {
+                originConfirm.innerHTML =
+                    "<b>Điểm bắt đầu:</b> " +
+                    escapeHtmlRoute(routeState.origin.label) +
+                    "<br><span style='color:#607d8b'>(" +
+                    routeState.origin.lat.toFixed(6) +
+                    ", " +
+                    routeState.origin.lng.toFixed(6) +
+                    ")</span>";
+            }
+            clearRouteOnly();
+        }
+        function getRouteModeLabel(uiProfile) {
+            for (var ri = 0; ri < ROUTE_MODES.length; ri++) {
+                if (ROUTE_MODES[ri].ui === uiProfile) return ROUTE_MODES[ri].label;
+            }
+            return "\u00d4 t\u00f4";
+        }
+
+        function pickBestOsrmRoute(routes) {
+            if (!routes || !routes.length) return null;
+            var best = routes[0];
+            for (var bi = 1; bi < routes.length; bi++) {
+                if (routes[bi].distance < best.distance) best = routes[bi];
+            }
+            return best;
+        }
+
+        function extractRouteSteps(best) {
+            var steps = [];
+            if (!best || !best.legs) return steps;
+            best.legs.forEach(function (leg) {
+                (leg.steps || []).forEach(function (st) {
+                    steps.push(st);
+                });
+            });
+            return steps;
+        }
+
+        function fetchOsrmRoute(osrmProfile, coordsPath, querySuffix) {
+            var url =
+                "https://router.project-osrm.org/route/v1/" +
+                osrmProfile +
+                "/" +
+                coordsPath +
+                querySuffix;
+            return fetch(url, { headers: { Accept: "application/json" } })
+                .then(function (r) {
+                    if (!r.ok) throw new Error("route_http");
+                    return r.json();
+                })
+                .then(function (payload) {
+                    var routes = (payload && payload.routes) || [];
+                    if (!routes.length) throw new Error("route_empty");
+                    return { best: pickBestOsrmRoute(routes), raw: payload };
+                });
+        }
+
+        function renderRouteSteps(steps) {
+            if (!steps || !steps.length) return "";
+            var html = "<div class='route-steps'>";
+            steps.forEach(function (st, idx) {
+                var text = (st.maneuver && st.maneuver.instruction) || st.name || "Tiếp tục đi thẳng";
+                var dist = formatDistance(st.distance || 0);
+                html +=
+                    "<div class='route-step'><b>" +
+                    (idx + 1) +
+                    ".</b> " +
+                    escapeHtmlRoute(text) +
+                    " <span style='color:#607d8b'>(" +
+                    dist +
+                    ")</span></div>";
+            });
+            html += "</div>";
+            return html;
+        }
+
+        function drawShortestRouteToBranch(opts) {
+            var silent = opts && typeof opts === "object" && opts.silent === true;
+            if (!routeState.origin) {
+                if (!silent) alert("Vui lòng xác nhận vị trí bắt đầu trước.");
+                return;
+            }
+            var routeSel = document.getElementById("route-branch-select");
+            if (!routeSel || !routeSel.value) {
+                if (!silent) alert("Vui lòng chọn chi nhánh đích.");
+                return;
+            }
+            var selected = routeSel.options[routeSel.selectedIndex];
+            var la = selected.getAttribute("data-lat");
+            var ln = selected.getAttribute("data-lng");
+            if (la == null || ln == null || la === "" || ln === "") {
+                if (!silent) {
+                    alert("Chi nhánh này chưa có tọa độ trung tâm để chỉ đường.");
+                }
+                return;
+            }
+            var profileSel = document.getElementById("route-profile-select");
+            var uiProfile = profileSel && profileSel.value ? profileSel.value : "driving";
+            routeState.activeProfile = uiProfile;
+
+            var mode = null;
+            for (var mi = 0; mi < ROUTE_MODES.length; mi++) {
+                if (ROUTE_MODES[mi].ui === uiProfile) {
+                    mode = ROUTE_MODES[mi];
+                    break;
+                }
+            }
+            if (!mode) mode = ROUTE_MODES[0];
+
+            routeState.destination = {
+                lat: parseFloat(la),
+                lng: parseFloat(ln),
+                label: selected.textContent || "Chi nhánh",
+            };
+            if (routeState.destinationMarker && routeLayer.hasLayer(routeState.destinationMarker)) {
+                routeLayer.removeLayer(routeState.destinationMarker);
+            }
+            routeState.destinationMarker = L.marker(
+                [routeState.destination.lat, routeState.destination.lng],
+                { title: "Chi nhánh đích" }
+            )
+                .bindPopup("<b>Chi nhánh đích</b><br>" + escapeHtmlRoute(routeState.destination.label))
+                .addTo(routeLayer);
+
+            var reqId = ++routeState.routeRequestId;
+            setRouteSummary(
+                "\u0110ang t\u00ednh l\u1ed9 tr\u00ecnh (" + escapeHtmlRoute(mode.label) + ")\u2026"
+            );
+
+            var coordsPath =
+                routeState.origin.lng +
+                "," +
+                routeState.origin.lat +
+                ";" +
+                routeState.destination.lng +
+                "," +
+                routeState.destination.lat;
+            var qs = "?overview=full&geometries=geojson&alternatives=false&steps=true";
+
+            fetchOsrmRoute(mode.osrm, coordsPath, qs)
+                .then(function (data) {
+                    if (reqId !== routeState.routeRequestId) return;
+                    var best = data.best;
+                    clearRoutePolylines();
+                    var layer = L.geoJSON(
+                        { type: "Feature", geometry: best.geometry, properties: {} },
+                        {
+                            style: {
+                                color: mode.color,
+                                weight: 6,
+                                opacity: 0.95,
+                                lineCap: "round",
+                                lineJoin: "round",
+                            },
+                        }
+                    ).addTo(routeLayer);
+                    routeState.polylineLayers.push(layer);
+                    var estSec = estimateDurationSecondsFromDistance(
+                        best.distance,
+                        mode.avgSpeedKmh
+                    );
+                    var timeStr = formatDuration(estSec);
+                    layer.bindPopup(
+                        "<b>" +
+                            escapeHtmlRoute(mode.label) +
+                            "</b><br>" +
+                            formatDistance(best.distance) +
+                            " \u00b7 " +
+                            timeStr
+                    );
+                    var steps = extractRouteSteps(best);
+                    var html =
+                        "<b>L\u1ed9 tr\u00ecnh \u2014 " +
+                        escapeHtmlRoute(mode.label) +
+                        "</b><br>\u0110i\u1ec3m \u0111i: " +
+                        escapeHtmlRoute(routeState.origin.label) +
+                        "<br>\u0110i\u1ec3m \u0111\u1ebfn: " +
+                        escapeHtmlRoute(routeState.destination.label) +
+                        "<br>Qu\u00e3ng \u0111\u01b0\u1eddng: <b>" +
+                        formatDistance(best.distance) +
+                        "</b><br>Th\u1eddi gian (\u01b0\u1edbc t\u00ednh, " +
+                        mode.avgSpeedKmh +
+                        " km/h): <b>" +
+                        timeStr +
+                        "</b>" +
+                        renderRouteSteps(steps);
+                    setRouteSummary(html);
+                    try {
+                        map.fitBounds(layer.getBounds(), { padding: [60, 60], maxZoom: 19 });
+                    } catch (eFit) {}
+                })
+                .catch(function () {
+                    if (reqId !== routeState.routeRequestId) return;
+                    setRouteSummary(
+                        "<span style='color:#b71c1c'>Kh\u00f4ng th\u1ec3 t\u00ednh l\u1ed9 tr\u00ecnh. Ki\u1ec3m tra l\u1ea1i \u0111i\u1ec3m b\u1eaft \u0111\u1ea7u/\u0111i\u1ec3m \u0111\u1ebfn ho\u1eb7c th\u1eed l\u1ea1i sau.</span>"
+                    );
+                });
+        }
+
+        (function initMapAddressAndBranchNav() {
+            var addrIn = document.getElementById("map-address-search-input");
+            var addrBtn = document.getElementById("btn-map-address-search");
+            if (addrBtn && addrIn) {
+                function runAddrSearch() {
+                    var q = addrIn.value.trim();
+                    if (!q) {
+                        alert("Vui lòng nhập địa chỉ.");
+                        return;
+                    }
+                    var url =
+                        "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
+                        encodeURIComponent(q);
+                    fetch(url, {
+                        headers: { Accept: "application/json", "Accept-Language": "vi,en" },
+                    })
+                        .then(function (r) {
+                            return r.json();
+                        })
+                        .then(function (arr) {
+                            if (!arr || !arr.length) {
+                                alert("Không tìm thấy địa chỉ. Thử mô tả rõ hơn.");
+                                return;
+                            }
+                            var o = arr[0];
+                            map.setView([parseFloat(o.lat), parseFloat(o.lon)], 18);
+                        })
+                        .catch(function () {
+                            alert("Lỗi khi tìm địa chỉ.");
+                        });
+                }
+                addrBtn.addEventListener("click", runAddrSearch);
+                addrIn.addEventListener("keydown", function (ev) {
+                    if (ev.key === "Enter") {
+                        ev.preventDefault();
+                        runAddrSearch();
+                    }
+                });
+            }
+            var bGo = document.getElementById("btn-map-branch-go");
+            var bSel = document.getElementById("map-branch-go-select");
+            if (bGo && bSel) {
+                bGo.addEventListener("click", function () {
+                    var opt = bSel.options[bSel.selectedIndex];
+                    if (!opt || !opt.value) {
+                        alert("Chọn một chi nhánh.");
+                        return;
+                    }
+                    var la = opt.getAttribute("data-lat");
+                    var ln = opt.getAttribute("data-lng");
+                    if (la == null || ln == null || la === "" || ln === "") {
+                        alert(
+                            "Chi nhánh này chưa có vùng trên bản đồ. Hãy cập nhật ranh giới chi nhánh trong quản trị."
+                        );
+                        return;
+                    }
+                    map.setView([parseFloat(la), parseFloat(ln)], 19);
+                });
+            }
+        })();
+
+        (function initRoutePanel() {
+            var btnUseGps = document.getElementById("btn-route-use-my-location");
+            var btnPickOnMap = document.getElementById("btn-route-pick-on-map");
+            var originInput = document.getElementById("route-origin-search-input");
+            var btnOriginSearch = document.getElementById("btn-route-origin-search");
+            var btnRouteStart = document.getElementById("btn-route-start");
+            var btnRouteClear = document.getElementById("btn-route-clear");
+            var branchSel = document.getElementById("route-branch-select");
+            var profileSel = document.getElementById("route-profile-select");
+
+            if (btnUseGps) {
+                btnUseGps.addEventListener("click", function () {
+                    setMapPickMode(false);
+                    if (!navigator.geolocation) {
+                        alert("Trình duyệt không hỗ trợ định vị GPS.");
+                        return;
+                    }
+                    setRouteSummary("Đang lấy vị trí hiện tại…");
+                    navigator.geolocation.getCurrentPosition(
+                        function (pos) {
+                            var lat = pos.coords.latitude;
+                            var lng = pos.coords.longitude;
+                            map.setView([lat, lng], 18);
+                            reverseGeocodeLatLng(lat, lng).then(function (address) {
+                                var label = address || "Vị trí GPS hiện tại";
+                                setOriginPoint(lat, lng, label, "gps");
+                                setRouteSummary(
+                                    "\u0110\u00e3 x\u00e1c nh\u1eadn v\u1ecb tr\u00ed. L\u1ed9 tr\u00ecnh s\u1ebd t\u1ef1 c\u1eadp nh\u1eadt khi \u0111\u00e3 ch\u1ecdn chi nh\u00e1nh."
+                                );
+                                if (branchSel && branchSel.value) {
+                                    drawShortestRouteToBranch({ silent: true });
+                                }
+                            });
+                        },
+                        function (err) {
+                            var msg = "Không thể lấy vị trí hiện tại.";
+                            if (err && err.code === err.PERMISSION_DENIED) {
+                                msg += " Bạn chưa cấp quyền truy cập vị trí.";
+                            }
+                            setRouteSummary("<span style='color:#b71c1c'>" + msg + "</span>");
+                        },
+                        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+                    );
+                });
+            }
+
+            if (btnPickOnMap) {
+                btnPickOnMap.addEventListener("click", function () {
+                    if (routeState.waitingPickOrigin) {
+                        setMapPickMode(false);
+                        setRouteSummary("Đã hủy chế độ ghim trên bản đồ.");
+                        return;
+                    }
+                    setMapPickMode(true);
+                    setRouteSummary(
+                        "Chế độ ghim đã bật. Hãy chạm/click vào vị trí bắt đầu trên bản đồ."
+                    );
+                });
+            }
+
+            function runOriginAddressSearch() {
+                if (!originInput) return;
+                setMapPickMode(false);
+                var q = originInput.value.trim();
+                if (!q) {
+                    alert("Vui lòng nhập địa chỉ điểm bắt đầu.");
+                    return;
+                }
+                setRouteSummary("Đang xác nhận vị trí từ địa chỉ…");
+                var url =
+                    "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
+                    encodeURIComponent(q);
+                fetch(url, {
+                    headers: { Accept: "application/json", "Accept-Language": "vi,en" },
+                })
+                    .then(function (r) {
+                        if (!r.ok) throw new Error("address_search_failed");
+                        return r.json();
+                    })
+                    .then(function (arr) {
+                        if (!arr || !arr.length) {
+                            setRouteSummary(
+                                "<span style='color:#b71c1c'>Không tìm thấy địa chỉ. Bạn hãy nhập chi tiết hơn.</span>"
+                            );
+                            return;
+                        }
+                        var o = arr[0];
+                        var lat = parseFloat(o.lat);
+                        var lng = parseFloat(o.lon);
+                        setOriginPoint(lat, lng, o.display_name || q, "address");
+                        map.setView([lat, lng], 18);
+                        setRouteSummary(
+                            "\u0110\u00e3 x\u00e1c nh\u1eadn \u0111\u1ecba ch\u1ec9. L\u1ed9 tr\u00ecnh s\u1ebd t\u1ef1 c\u1eadp nh\u1eadt khi \u0111\u00e3 ch\u1ecdn chi nh\u00e1nh."
+                        );
+                        if (branchSel && branchSel.value) {
+                            drawShortestRouteToBranch({ silent: true });
+                        }
+                    })
+                    .catch(function () {
+                        setRouteSummary(
+                            "<span style='color:#b71c1c'>Lỗi khi xác nhận địa chỉ bắt đầu.</span>"
+                        );
+                    });
+            }
+
+            if (btnOriginSearch) btnOriginSearch.addEventListener("click", runOriginAddressSearch);
+            if (originInput) {
+                originInput.addEventListener("keydown", function (ev) {
+                    if (ev.key === "Enter") {
+                        ev.preventDefault();
+                        runOriginAddressSearch();
+                    }
+                });
+            }
+            if (btnRouteStart) btnRouteStart.addEventListener("click", drawShortestRouteToBranch);
+            if (branchSel) {
+                branchSel.addEventListener("change", function () {
+                    if (routeState.origin && branchSel.value) {
+                        drawShortestRouteToBranch({ silent: true });
+                    }
+                });
+            }
+            if (profileSel) {
+                profileSel.addEventListener("change", function () {
+                    if (routeState.origin && branchSel && branchSel.value) {
+                        drawShortestRouteToBranch({ silent: true });
+                    }
+                });
+            }
+            if (btnRouteClear) {
+                btnRouteClear.addEventListener("click", function () {
+                    setMapPickMode(false);
+                    clearAllRouteState();
+                });
+            }
+        })();
+
+        map.on("click", function (e) {
+            if (!routeState.waitingPickOrigin) return;
+            var latlng = e && e.latlng;
+            if (!latlng) return;
+            setMapPickMode(false);
+            setOriginPoint(latlng.lat, latlng.lng, "Điểm ghim trên bản đồ", "map_pin");
+            reverseGeocodeLatLng(latlng.lat, latlng.lng).then(function (address) {
+                if (address) {
+                    setOriginPoint(latlng.lat, latlng.lng, address, "map_pin");
+                }
+                setRouteSummary(
+                    "Đã ghim điểm bắt đầu trên bản đồ. Chọn chi nhánh để hệ thống chỉ đường."
+                );
+                var branchSel = document.getElementById("route-branch-select");
+                if (branchSel && branchSel.value) {
+                    drawShortestRouteToBranch({ silent: true });
+                }
+            });
+        });
+
+        var VI_TREE_STATUS = { good: "Tốt", diseased: "Bệnh", dangerous: "Nguy hiểm" };
+        var VI_INCIDENT_PRIORITY = { low: "Thấp", medium: "Trung bình", high: "Cao" };
+        var VI_INCIDENT_STATUS = { open: "Mở", processing: "Đang xử lý", closed: "Đã đóng" };
+        var VI_EQUIPMENT_STATUS = { good: "Tốt", maintenance: "Đang sửa", broken: "Hỏng" };
+
+        var buildingStyle = {
+            color: "#2980b9",
+            weight: 3,
+            opacity: 1,
+            fillColor: "#3498db",
+            fillOpacity: 0.5,
+        };
+
+        function treePoint(feature, latlng) {
+            var color = "#27ae60";
+            if (feature.properties.health_status == "diseased") color = "#f39c12";
+            if (feature.properties.health_status == "dangerous") color = "#c0392b";
+            return L.circleMarker(latlng, {
+                radius: 5,
+                fillColor: color,
+                color: "#fff",
+                weight: 1,
+                opacity: 1,
+                fillOpacity: 1,
+            });
+        }
+
+        function incidentPoint(feature, latlng) {
+            return L.circleMarker(latlng, {
+                radius: 10,
+                fillColor: "#e74c3c",
+                color: "#c0392b",
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8,
+            });
+        }
+
+        var roomStyle = {
+            color: "#6a1b9a",
+            weight: 2,
+            opacity: 1,
+            fillColor: "#9b59b6",
+            fillOpacity: 0.45,
+        };
+
+        var EQUIPMENT_COLORS = {
+            good: { fill: "#1565c0", stroke: "#0d47a1" },
+            maintenance: { fill: "#f9a825", stroke: "#f57f17" },
+            broken: { fill: "#c62828", stroke: "#b71c1c" },
+        };
+        function equipmentPoint(feature, latlng) {
+            var status = (feature.properties && feature.properties.status) || "good";
+            var colors = EQUIPMENT_COLORS[status] || EQUIPMENT_COLORS.good;
+            return L.circleMarker(latlng, {
+                radius: 6,
+                fillColor: colors.fill,
+                color: colors.stroke,
+                weight: 1,
+                fillOpacity: 1,
+            });
+        }
+
+        function viRoomType(code) {
+            var mapType = {
+                classroom: "Phòng học",
+                lab: "Phòng thí nghiệm",
+                library: "Thư viện",
+                office: "Văn phòng",
+                hall: "Hội trường",
+            };
+            return mapType[code] || code || "";
+        }
+
+        function makeImageHtml(url, altText) {
+            if (!url) return "";
+            return (
+                "<div style='margin-top:8px'>" +
+                "<img src='" +
+                url +
+                "' alt='" +
+                (altText || "image") +
+                "' " +
+                "style='width:100%;max-width:240px;max-height:140px;object-fit:cover;border-radius:8px;border:1px solid #d7e0d7;'/>" +
+                "</div>"
+            );
+        }
+
+        function renderSelectedDetails(title, html) {
+            var el = document.getElementById("query-results");
+            if (!el) return;
+            el.innerHTML = "<strong>" + title + "</strong><div style='margin-top:6px'>" + html + "</div>";
+        }
+
+        function handleFeatureClick(e, detailTitle, detailHtml) {
+            renderSelectedDetails(detailTitle, detailHtml);
+        }
+
+        /* ---------- Drill-down state ---------- */
+        var viewMode = "campus";
+        var currentBuildingId = null;
+        var currentBuildingName = "";
+        var currentFloorId = null;
+        var currentFloorLabel = "";
+        var floorPlanGroup = L.layerGroup();
+        var buildingHighlightLayer = L.layerGroup();
+        var indoorMap = null;
+
+        var drillPanel = document.getElementById("drill-panel");
+        var drillTitle = document.getElementById("drill-panel-title");
+        var drillBody = document.getElementById("drill-panel-body");
+        var drillActions = document.getElementById("drill-panel-actions");
+        var drillHint = document.getElementById("drill-panel-hint");
+        var mapBreadcrumb = document.getElementById("map-breadcrumb");
+        var drillFloorDetail = document.getElementById("drill-floor-detail");
+        var lastDrillPayload = null;
+
+        function escapeHtmlDrill(s) {
+            if (s == null || s === "") return "";
+            var d = document.createElement("div");
+            d.textContent = s;
+            return d.innerHTML;
+        }
+
+        function clearDrillBuildingUIExtra() {
+            var info = document.getElementById("drill-building-info");
+            var resLeft = document.getElementById("drill-building-search-results-left");
+            var inp = document.getElementById("drill-building-search-input");
+            if (info) info.innerHTML = "";
+            if (resLeft) resLeft.innerHTML = "";
+            if (inp) inp.value = "";
+            lastDrillPayload = null;
+        }
+
+        function renderDrillBuildingInfo(data) {
+            lastDrillPayload = data;
+            var el = document.getElementById("drill-building-info");
+            if (!el) return;
+            var b = data.building;
+            var floors = data.floors || [];
+            var rooms = data.rooms || [];
+            if (!b) {
+                el.innerHTML = "";
+                return;
+            }
+            var nf = floors.length;
+            var nr = rooms.length;
+            var desc = (b.description || "").trim();
+            var branch = (b.branch_name || "").trim() || "—";
+            el.innerHTML =
+                "<div class='drill-info-row'><span class='drill-info-label'>Cơ sở / chi nhánh:</span> " +
+                escapeHtmlDrill(branch) +
+                "</div>" +
+                (desc
+                    ? "<div class='drill-info-row'><span class='drill-info-label'>Mô tả tòa:</span> " +
+                      escapeHtmlDrill(desc) +
+                      "</div>"
+                    : "") +
+                "<div class='drill-info-row'><span class='drill-info-label'>Tổng quan:</span> " +
+                nf +
+                " tầng, " +
+                nr +
+                " phòng trong hệ thống.</div>" +
+                "<div class='drill-info-row hint' style='margin-top:6px'>Địa chỉ chi tiết: dùng tìm OSM (panel phải) hoặc polygon chi nhánh trên bản đồ; tòa thuộc cơ sở đã ghi ở trên.</div>";
+        }
+
+        function applyFloorsPayloadData(data) {
+            if (drillHint) drillHint.textContent = "";
+            renderDrillBuildingInfo(data);
+            var floors = data.floors || [];
+            var rooms = data.rooms || [];
+            var rl = document.getElementById("drill-building-search-results-left");
+            if (!floors.length) {
+                if (drillBody)
+                    drillBody.innerHTML =
+                        "<p class='hint'>Chưa khai báo tầng cho tòa nhà này. Vào quản trị → Tầng để thêm.</p>";
+                if (rl)
+                    rl.innerHTML =
+                        "<span class='hint'>Chưa có tầng — không thể liệt kê phòng. Thêm tầng gắn với <b>tòa này</b> trong quản trị.</span>";
+                return false;
+            }
+            appendFloorButtons(floors);
+            if (rl) {
+                rl.innerHTML =
+                    "<span class='hint'>Đã tải <b>" +
+                    floors.length +
+                    "</b> tầng, <b>" +
+                    rooms.length +
+                    "</b> phòng. Gõ <b>tầng 1</b> / <b>tang 1</b> hoặc tên phòng, rồi bấm <b>Tìm</b> — kết quả hiện ở đây.</span>";
+            }
+            return true;
+        }
+
+        function clearDrillFloorDetail() {
+            if (!drillFloorDetail) return;
+            drillFloorDetail.innerHTML = "";
+            drillFloorDetail.classList.remove("visible");
+        }
+
+        function renderFloorDetailPanel(roomFeats, eqItems) {
+            if (!drillFloorDetail) return;
+            clearDrillFloorDetail();
+            var hasRooms = roomFeats && roomFeats.length;
+            var hasEq = eqItems && eqItems.length;
+            if (!hasRooms && !hasEq) return;
+            if (hasRooms) {
+                var sh = document.createElement("div");
+                sh.className = "drill-subheading";
+                sh.textContent = "Phòng";
+                drillFloorDetail.appendChild(sh);
+                var ul = document.createElement("ul");
+                ul.className = "drill-list";
+                roomFeats.forEach(function (f) {
+                    var p = f.properties || {};
+                    var li = document.createElement("li");
+                    var btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "drill-link";
+                    btn.textContent = p.name || "Phòng";
+                    btn.addEventListener("click", function () {
+                        openRoomIndoor(p.id, p.name || "Phòng");
+                    });
+                    li.appendChild(btn);
+                    ul.appendChild(li);
+                });
+                drillFloorDetail.appendChild(ul);
+            }
+            if (hasEq) {
+                var sh2 = document.createElement("div");
+                sh2.className = "drill-subheading";
+                sh2.textContent = "Thiết bị";
+                drillFloorDetail.appendChild(sh2);
+                var ul2 = document.createElement("ul");
+                ul2.className = "drill-list drill-list-compact";
+                eqItems.forEach(function (it) {
+                    var li = document.createElement("li");
+                    var st = VI_EQUIPMENT_STATUS[it.status] || it.status || "";
+                    li.appendChild(
+                        document.createTextNode(
+                            (it.code || "") + " — " + (it.name || "") + " · " + st
+                        )
+                    );
+                    if (!it.has_gps) {
+                        var note = document.createElement("span");
+                        note.className = "drill-gps-note";
+                        note.textContent = " (chưa có GPS)";
+                        li.appendChild(note);
+                    }
+                    ul2.appendChild(li);
+                });
+                drillFloorDetail.appendChild(ul2);
+            }
+            drillFloorDetail.classList.add("visible");
+        }
+
+        function updateBreadcrumb() {
+            var parts = ["Khuôn viên"];
+            if (currentBuildingName) parts.push(currentBuildingName);
+            if (currentFloorLabel) parts.push(currentFloorLabel);
+            var s = parts.join(" → ");
+            if (mapBreadcrumb) {
+                mapBreadcrumb.textContent = viewMode === "campus" ? "" : s;
+                mapBreadcrumb.setAttribute("title", s);
+            }
+        }
+
+        function showDrillPanel(show) {
+            if (!drillPanel) return;
+            drillPanel.classList.toggle("visible", !!show);
+            if (!show) {
+                setPanelMobileOpen(drillPanel, false);
+            } else if (isMobileViewport()) {
+                setPanelMobileOpen(drillPanel, true);
+                setPanelMobileOpen(document.querySelector(".query-panel"), false);
+                setPanelMobileOpen(document.getElementById("route-panel"), false);
+                setPanelMobileOpen(document.getElementById("map-legend"), false);
+            }
+            syncMobileActionStates();
+        }
+
+        function clearDrillActions() {
+            if (drillActions) drillActions.innerHTML = "";
+            if (drillBody) drillBody.innerHTML = "";
+            if (drillHint) drillHint.textContent = "";
+            clearDrillFloorDetail();
+            clearDrillBuildingUIExtra();
+        }
+
+        function resetCampusView() {
+            viewMode = "campus";
+            currentBuildingId = null;
+            currentBuildingName = "";
+            currentFloorId = null;
+            currentFloorLabel = "";
+            map.removeLayer(floorPlanGroup);
+            floorPlanGroup.clearLayers();
+            map.removeLayer(buildingHighlightLayer);
+            buildingHighlightLayer.clearLayers();
+            if (!map.hasLayer(treesLayer)) map.addLayer(treesLayer);
+            if (!map.hasLayer(incidentsLayer)) map.addLayer(incidentsLayer);
+            if (!map.hasLayer(buildingsLayer)) map.addLayer(buildingsLayer);
+            showDrillPanel(false);
+            clearDrillActions();
+            updateBreadcrumb();
+            advancedResultLayer.clearLayers();
+            setRoutePanelVisible(true);
+            focusCampusOverview();
+        }
+
+        function getBuildingFeatureById(bid) {
+            var feats = (buildingsData && buildingsData.features) || [];
+            for (var i = 0; i < feats.length; i++) {
+                if (feats[i].properties && feats[i].properties.id == bid) return feats[i];
+            }
+            return null;
+        }
+
+        function beginBuildingDrill(bid, bname) {
+            if (map.hasLayer(floorPlanGroup)) map.removeLayer(floorPlanGroup);
+            floorPlanGroup.clearLayers();
+            if (map.hasLayer(buildingHighlightLayer)) map.removeLayer(buildingHighlightLayer);
+            buildingHighlightLayer.clearLayers();
+            if (!map.hasLayer(treesLayer)) map.addLayer(treesLayer);
+            if (!map.hasLayer(incidentsLayer)) map.addLayer(incidentsLayer);
+
+            currentBuildingId = bid;
+            currentBuildingName = bname || "Tòa nhà";
+            currentFloorId = null;
+            currentFloorLabel = "";
+            viewMode = "floor_select";
+            showDrillPanel(true);
+            setRoutePanelVisible(false);
+            if (drillTitle) drillTitle.textContent = currentBuildingName;
+            clearDrillActions();
+            updateBreadcrumb();
+        }
+
+        function appendFloorButtons(floors) {
+            (floors || []).forEach(function (f) {
+                var btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "floor-btn";
+                var rc = f.room_count != null ? f.room_count : 0;
+                btn.textContent = (f.name || "Tầng") + " (cấp " + f.level + ") — " + rc + " phòng";
+                btn.addEventListener("click", function () {
+                    loadFloorRooms(f.id, f.name || "Tầng");
+                });
+                drillActions.appendChild(btn);
+            });
+        }
+
+        function openBuildingFloors(bid, bname) {
+            beginBuildingDrill(bid, bname);
+            if (drillHint) drillHint.textContent = "Đang tải danh sách tầng…";
+            fetch(apiUrlBuildingFloors(bid), { credentials: "same-origin" })
+                .then(function (r) {
+                    if (!r.ok) throw new Error("http " + r.status);
+                    return r.json();
+                })
+                .then(function (data) {
+                    applyFloorsPayloadData(data);
+                })
+                .catch(function () {
+                    if (drillHint) drillHint.textContent = "Không tải được danh sách tầng.";
+                });
+        }
+
+        function extractFloorLevelFromQuery(q) {
+            var s = (q || "").trim().toLowerCase();
+            var m = s.match(/t[ầa]ng\s*(\d+)/);
+            if (m) return parseInt(m[1], 10);
+            m = s.match(/tang\s*(\d+)/);
+            if (m) return parseInt(m[1], 10);
+            m = s.match(/^(\d+)$/);
+            if (m) return parseInt(m[1], 10);
+            return null;
+        }
+
+        function runDrillBuildingSearch() {
+            var resLeft = document.getElementById("drill-building-search-results-left");
+            var inp = document.getElementById("drill-building-search-input");
+            if (!resLeft || !inp) return;
+            resLeft.innerHTML = "";
+            if (!lastDrillPayload) {
+                resLeft.innerHTML = "<span class='hint'>Chưa có dữ liệu tòa — click lại vào tòa nhà.</span>";
+                return;
+            }
+            var qRaw = (inp.value || "").trim();
+            var q = qRaw.toLowerCase();
+            if (!q) {
+                resLeft.innerHTML =
+                    "<span class='hint'>Gõ <b>tầng 1</b> để xem danh sách phòng; hoặc tên phòng để biết thuộc tầng nào.</span>";
+                return;
+            }
+            var b = lastDrillPayload.building || {};
+            var floors = lastDrillPayload.floors || [];
+            var rooms = lastDrillPayload.rooms || [];
+            function hasQ(text) {
+                return ((text || "") + "").toLowerCase().indexOf(q) !== -1;
+            }
+            var levelHint = extractFloorLevelFromQuery(qRaw);
+
+            function roomsOnFloor(floorId) {
+                return rooms.filter(function (r) {
+                    return String(r.floor_id) === String(floorId);
+                });
+            }
+
+            var matchedFloors = floors.filter(function (f) {
+                if (levelHint != null && !isNaN(levelHint) && f.level === levelHint) return true;
+                return hasQ((f.name || "") + " " + String(f.level));
+            });
+
+            var frag = document.createDocumentFragment();
+
+            if (
+                matchedFloors.length > 0 &&
+                (levelHint != null || /t[ầa]ng|tang/.test(q) || matchedFloors.length < floors.length)
+            ) {
+                matchedFloors.forEach(function (f) {
+                    var rlist = roomsOnFloor(f.id);
+                    var block = document.createElement("div");
+                    block.className = "drill-left-floor-block";
+                    var title = document.createElement("div");
+                    title.className = "drill-left-floor-title";
+                    title.textContent =
+                        (f.name || "Tầng") + " — cấp " + f.level + " (" + rlist.length + " phòng)";
+                    block.appendChild(title);
+                    var openFloor = document.createElement("button");
+                    openFloor.type = "button";
+                    openFloor.className = "drill-search-hit drill-search-hit-compact";
+                    openFloor.textContent = "▶ Mở mặt bằng tầng này trên bản đồ";
+                    openFloor.addEventListener("click", function () {
+                        loadFloorRooms(f.id, f.name || "Tầng");
+                    });
+                    block.appendChild(openFloor);
+                    if (!rlist.length) {
+                        var empty = document.createElement("div");
+                        empty.className = "hint drill-left-room-empty";
+                        empty.textContent = "Chưa có phòng gán cho tầng này trong hệ thống.";
+                        block.appendChild(empty);
+                    } else {
+                        var ul = document.createElement("ul");
+                        ul.className = "drill-left-room-list";
+                        rlist.forEach(function (r) {
+                            var li = document.createElement("li");
+                            var btn = document.createElement("button");
+                            btn.type = "button";
+                            btn.className = "drill-left-room-btn";
+                            btn.innerHTML =
+                                "<span class='drill-lr-name'>" +
+                                escapeHtmlDrill(r.name || "Phòng") +
+                                "</span><span class='drill-lr-meta'>Tầng " +
+                                escapeHtmlDrill(r.floor_name || "") +
+                                " · cấp " +
+                                (r.level != null ? r.level : "—") +
+                                "</span>";
+                            btn.addEventListener("click", function () {
+                                loadFloorRooms(r.floor_id, r.floor_name || "Tầng");
+                                setTimeout(function () {
+                                    openRoomIndoor(r.id, r.name || "Phòng");
+                                }, 320);
+                            });
+                            li.appendChild(btn);
+                            ul.appendChild(li);
+                        });
+                        block.appendChild(ul);
+                    }
+                    frag.appendChild(block);
+                });
+            }
+
+            var roomHits = rooms.filter(function (r) {
+                var blob =
+                    (r.name || "") +
+                    " " +
+                    (r.floor_name || "") +
+                    " " +
+                    String(r.level) +
+                    " " +
+                    (r.branch_name || "") +
+                    " " +
+                    (r.building_name || "");
+                return hasQ(blob);
+            });
+
+            if (!frag.childNodes.length && roomHits.length) {
+                var rhTitle = document.createElement("div");
+                rhTitle.className = "drill-left-floor-title";
+                rhTitle.textContent = "Phòng khớp \"" + qRaw.replace(/"/g, "") + "\"";
+                frag.appendChild(rhTitle);
+                var ul2 = document.createElement("ul");
+                ul2.className = "drill-left-room-list";
+                roomHits.slice(0, 40).forEach(function (r) {
+                    var li = document.createElement("li");
+                    var btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "drill-left-room-btn";
+                    btn.innerHTML =
+                        "<span class='drill-lr-name'>" +
+                        escapeHtmlDrill(r.name || "Phòng") +
+                        "</span><span class='drill-lr-meta'>Thuộc: " +
+                        escapeHtmlDrill(r.floor_name || "—") +
+                        " (cấp " +
+                        (r.level != null ? r.level : "—") +
+                        ") · " +
+                        escapeHtmlDrill(r.branch_name || "") +
+                        "</span>";
+                    btn.addEventListener("click", function () {
+                        loadFloorRooms(r.floor_id, r.floor_name || "Tầng");
+                        setTimeout(function () {
+                            openRoomIndoor(r.id, r.name || "Phòng");
+                        }, 320);
+                    });
+                    li.appendChild(btn);
+                    ul2.appendChild(li);
+                });
+                frag.appendChild(ul2);
+            }
+
+            if (!frag.childNodes.length) {
+                if (hasQ(b.name) || hasQ(b.branch_name) || hasQ(b.description)) {
+                    resLeft.innerHTML =
+                        "<div class='hint'>Tòa <b>" +
+                        escapeHtmlDrill(b.name) +
+                        "</b> — cơ sở <b>" +
+                        escapeHtmlDrill(b.branch_name || "—") +
+                        "</b>. Thử <b>tầng 1</b>, <b>tầng 2</b> hoặc tên phòng; hoặc chọn nút tầng bên phải.</div>";
+                } else {
+                    resLeft.innerHTML =
+                        "<span class='hint'>Không có phòng/tầng khớp. Kiểm tra phòng đã gán đúng <b>tòa</b> và <b>tầng</b> trong quản trị.</span>";
+                }
+                return;
+            }
+
+            resLeft.appendChild(frag);
+        }
+
+        function loadFloorRooms(floorId, floorLabel) {
+            currentFloorId = floorId;
+            currentFloorLabel = floorLabel || "Tầng";
+            viewMode = "floor_plan";
+            updateBreadcrumb();
+            if (drillHint) drillHint.textContent = "Đang tải phòng và thiết bị…";
+            clearDrillFloorDetail();
+            if (drillBody) drillBody.innerHTML = "";
+
+            map.removeLayer(floorPlanGroup);
+            floorPlanGroup.clearLayers();
+            map.removeLayer(buildingHighlightLayer);
+            buildingHighlightLayer.clearLayers();
+
+            if (map.hasLayer(treesLayer)) map.removeLayer(treesLayer);
+            if (map.hasLayer(incidentsLayer)) map.removeLayer(incidentsLayer);
+
+            var bf = getBuildingFeatureById(currentBuildingId);
+            if (bf) {
+                L.geoJSON(bf, {
+                    style: {
+                        color: "#e65100",
+                        weight: 4,
+                        fillColor: "#ffb74d",
+                        fillOpacity: 0.35,
+                    },
+                }).addTo(buildingHighlightLayer);
+                buildingHighlightLayer.addTo(map);
+            }
+
+            var roomsP = fetch(apiUrlFloorRooms(floorId)).then(function (r) {
+                return r.json();
+            });
+            var eqP = fetch(apiUrlFloorEquipment(floorId))
+                .then(function (r) {
+                    return r.ok ? r.json() : { geojson: { features: [] }, items: [] };
+                })
+                .catch(function () {
+                    return { geojson: { features: [] }, items: [] };
+                });
+
+            return Promise.all([roomsP, eqP])
+                .then(function (pair) {
+                    var geo = pair[0];
+                    var eqPayload = pair[1] || {};
+                    var eqGeo = eqPayload.geojson || { type: "FeatureCollection", features: [] };
+                    var eqItems = eqPayload.items || [];
+
+                    if (drillHint) drillHint.textContent = "";
+                    var feats = geo.features || [];
+                    var eqF = (eqGeo.features || []).slice();
+
+                    if (!feats.length) {
+                        clearDrillFloorDetail();
+                        if (drillBody) {
+                            drillBody.innerHTML =
+                                "<p class='hint'>Tầng này <b>chưa có phòng</b> trên bản đồ (polygon). Không hiển thị sơ đồ mặt bằng — hãy chọn tầng khác hoặc thêm phòng trong quản trị (CSVC → Phòng).</p>";
+                        }
+                        floorPlanGroup.addTo(map);
+                        try {
+                            if (bf) {
+                                var tmpEmpty = L.geoJSON(bf);
+                                map.fitBounds(tmpEmpty.getBounds(), { padding: [40, 40], maxZoom: 20 });
+                            }
+                        } catch (e0) {}
+                        return;
+                    }
+
+                    renderFloorDetailPanel(feats, eqItems);
+
+                    if (feats.length && drillBody) {
+                        drillBody.innerHTML =
+                            "<p class='hint'>Click một <b>phòng</b> trên bản đồ hoặc trong danh sách để mở sơ đồ và thiết bị.</p>";
+                    }
+
+                    function addEquipmentToFloorPlan(collection) {
+                        L.geoJSON(collection, {
+                            pointToLayer: equipmentPoint,
+                            onEachFeature: function (feature, layer) {
+                                var st = feature.properties && feature.properties.status;
+                                var viStatus = VI_EQUIPMENT_STATUS[st] || st || "";
+                                var p = feature.properties || {};
+                                var html =
+                                    "<b>⚙️ Thiết bị: " + (feature.properties.code || "") + "</b>" +
+                                    "<br>Tên: " + (feature.properties.name || "") +
+                                    "<br>Trạng thái: " + viStatus +
+                                    "<br>Phòng: " + (p.room_name || "") +
+                                    makeImageHtml(p.blueprint_url, "Sơ đồ phòng");
+                                layer.bindPopup(html);
+                                layer.on("click", function (e) {
+                                    L.DomEvent.stopPropagation(e);
+                                    renderSelectedDetails("Chi tiết thiết bị", html);
+                                });
+                            },
+                        }).addTo(floorPlanGroup);
+                    }
+
+                    if (feats.length) {
+                        L.geoJSON(geo, {
+                            style: roomStyle,
+                            onEachFeature: function (feature, layer) {
+                                var p = feature.properties || {};
+                                var html =
+                                    "<b>🚪 " +
+                                    (p.name || "") +
+                                    "</b><br>Loại: " +
+                                    viRoomType(p.room_type) +
+                                    "<br>Sức chứa: " +
+                                    (p.capacity || "-");
+                                layer.bindPopup(html);
+                                layer.on("click", function (e) {
+                                    L.DomEvent.stopPropagation(e);
+                                    openRoomIndoor(p.id, p.name || "Phòng");
+                                });
+                            },
+                        }).addTo(floorPlanGroup);
+                    }
+
+                    if (eqF.length) {
+                        addEquipmentToFloorPlan(eqGeo);
+                    }
+
+                    floorPlanGroup.addTo(map);
+
+                    try {
+                        var combined = L.featureGroup();
+                        floorPlanGroup.eachLayer(function (ly) {
+                            combined.addLayer(ly);
+                        });
+                        if (combined.getLayers().length) {
+                            var b = combined.getBounds();
+                            if (b && b.isValid()) {
+                                map.fitBounds(b, { padding: [40, 40], maxZoom: 21 });
+                                return;
+                            }
+                        }
+                        if (bf) {
+                            var tmp = L.geoJSON(bf);
+                            map.fitBounds(tmp.getBounds(), { padding: [40, 40], maxZoom: 20 });
+                        }
+                    } catch (e) {
+                        try {
+                            if (bf) {
+                                var tmp2 = L.geoJSON(bf);
+                                map.fitBounds(tmp2.getBounds(), { padding: [40, 40], maxZoom: 20 });
+                            }
+                        } catch (e2) {}
+                    }
+                })
+                .catch(function () {
+                    if (drillHint) drillHint.textContent = "Không tải được dữ liệu cho tầng này.";
+                    throw new Error("floor_load_failed");
+                });
+        }
+
+        function navigateFromEquipmentSearch(hit) {
+            if (!hit || !hit.building_id || !hit.floor_id || !hit.room_id) {
+                alert("Thiếu dữ liệu tòa nhà / tầng / phòng để điều hướng.");
+                return;
+            }
+            closeIndoor();
+            advancedResultLayer.clearLayers();
+            if (map.hasLayer(advancedResultLayer)) map.removeLayer(advancedResultLayer);
+
+            beginBuildingDrill(hit.building_id, hit.building_name);
+            if (drillHint) drillHint.textContent = "Đang tải danh sách tầng…";
+            fetch(apiUrlBuildingFloors(hit.building_id), { credentials: "same-origin" })
+                .then(function (r) {
+                    if (!r.ok) throw new Error("http");
+                    return r.json();
+                })
+                .then(function (data) {
+                    if (!applyFloorsPayloadData(data)) throw new Error("no_floors");
+                    return loadFloorRooms(hit.floor_id, hit.floor_name || "Tầng");
+                })
+                .then(function () {
+                    setTimeout(function () {
+                        openRoomIndoor(hit.room_id, hit.room_name || "Phòng");
+                    }, 280);
+                })
+                .catch(function (err) {
+                    if (err && err.message === "no_floors") return;
+                    if (err && err.message === "floor_load_failed") {
+                        alert("Không tải được dữ liệu tầng / phòng.");
+                        return;
+                    }
+                    if (drillHint) drillHint.textContent = "Không tải được danh sách tầng.";
+                });
+        }
+
+        function equipmentTypeCategory(eqType) {
+            var t = ((eqType || "") + "").toLowerCase();
+            if (/loa|speaker|audio|âm thanh|mic/.test(t)) return "speaker";
+            if (/mạng|network|switch|router|hub|wifi|lan/.test(t)) return "network";
+            return "computer";
+        }
+
+        function indoorMarkerIcon(category) {
+            var bg = "#1565c0";
+            var sym = "🖥";
+            if (category === "speaker") {
+                bg = "#ec407a";
+                sym = "🔊";
+            }
+            if (category === "network") {
+                bg = "#c62828";
+                sym = "📡";
+            }
+            return L.divIcon({
+                className: "indoor-marker-icon",
+                html:
+                    '<div style="width:28px;height:28px;border-radius:50%;background:' +
+                    bg +
+                    ";color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);\">" +
+                    sym +
+                    "</div>",
+                iconSize: [28, 28],
+                iconAnchor: [14, 14],
+            });
+        }
+
+        function closeIndoor() {
+            var ov = document.getElementById("indoor-overlay");
+            if (ov) ov.classList.remove("visible");
+            if (indoorMap) {
+                indoorMap.remove();
+                indoorMap = null;
+            }
+        }
+
+        function openRoomIndoor(roomId, roomName) {
+            fetch(apiUrlRoomLayout(roomId))
+                .then(function (r) {
+                    return r.json();
+                })
+                .then(function (data) {
+                    var room = data.room || {};
+                    var equip = data.equipment || [];
+                    var ov = document.getElementById("indoor-overlay");
+                    var titleEl = document.getElementById("indoor-title-text");
+                    var countEl = document.getElementById("indoor-device-count");
+                    if (titleEl) titleEl.textContent = room.name || roomName || "Phòng";
+                    if (countEl) countEl.textContent = equip.length + " Thiết bị";
+                    if (ov) ov.classList.add("visible");
+
+                    var H = room.blueprint_height || 600;
+                    var W = room.blueprint_width || 800;
+                    var bp = room.blueprint_url || "";
+
+                    setTimeout(function () {
+                        if (indoorMap) {
+                            indoorMap.remove();
+                            indoorMap = null;
+                        }
+                        indoorMap = L.map("indoor-map", {
+                            crs: L.CRS.Simple,
+                            minZoom: -2,
+                            maxZoom: 2,
+                        });
+                        if (indoorMap && indoorMap.zoomControl) {
+                            indoorMap.zoomControl.setPosition("bottomright");
+                        }
+
+                        var bounds = [
+                            [0, 0],
+                            [H, W],
+                        ];
+                        if (bp) {
+                            L.imageOverlay(bp, bounds).addTo(indoorMap);
+                        } else {
+                            L.rectangle(bounds, {
+                                color: "#1e3a5f",
+                                weight: 2,
+                                fillColor: "#0f172a",
+                                fillOpacity: 1,
+                            }).addTo(indoorMap);
+                            L.marker([H / 2, W / 2], {
+                                icon: L.divIcon({
+                                    className: "indoor-label",
+                                    html:
+                                        '<div style="color:rgba(255,255,255,.25);font-size:22px;font-weight:700;white-space:nowrap;">Sơ đồ room_' +
+                                        roomId +
+                                        "</div>",
+                                    iconSize: [200, 40],
+                                    iconAnchor: [100, 20],
+                                }),
+                            }).addTo(indoorMap);
+                        }
+
+                        equip.forEach(function (eq) {
+                            if (eq.local_x == null || eq.local_y == null) return;
+                            var lat = H - eq.local_y;
+                            var lng = eq.local_x;
+                            var cat = equipmentTypeCategory(eq.equipment_type);
+                            var viStatus = VI_EQUIPMENT_STATUS[eq.status] || eq.status || "";
+                            var popup =
+                                "<b>" +
+                                (eq.code || "") +
+                                "</b><br>" +
+                                (eq.name || "") +
+                                "<br>Loại: " +
+                                (eq.equipment_type || "-") +
+                                "<br>Trạng thái: " +
+                                viStatus;
+                            L.marker([lat, lng], { icon: indoorMarkerIcon(cat) })
+                                .bindPopup(popup)
+                                .addTo(indoorMap);
+                        });
+
+                        indoorMap.fitBounds(bounds);
+                    }, 50);
+                })
+                .catch(function () {
+                    alert("Không tải được sơ đồ phòng.");
+                });
+        }
+
+        document.getElementById("indoor-close").addEventListener("click", closeIndoor);
+
+        /* ---------- Main layers ---------- */
+        var buildingsLayer = L.geoJSON(buildingsData, {
+            style: buildingStyle,
+            onEachFeature: function (feature, layer) {
+                var p = feature.properties || {};
+                var bid = p.id;
+                var branchLine =
+                    p.university_branch_name
+                        ? "<br><span style='color:#1565c0;font-weight:600'>Cơ sở:</span> " +
+                          p.university_branch_name
+                        : "";
+                var html = "<b>🏢 " + (p.name || "") + "</b><br>" + (p.description || "") + branchLine;
+                layer.bindPopup(html);
+                layer.bindTooltip("Click: chọn tầng / vào trong tòa nhà", { sticky: true });
+                layer.on("click", function (e) {
+                    L.DomEvent.stopPropagation(e);
+                    if (bid != null) openBuildingFloors(bid, p.name);
+                    else renderSelectedDetails("Tòa nhà", html);
+                });
+            },
+        }).addTo(map);
+
+        var treesLayer = L.geoJSON(treesData, {
+            pointToLayer: treePoint,
+            onEachFeature: function (feature, layer) {
+                var status = feature.properties.health_status;
+                var icon = "🌳";
+                if (status == "dangerous") icon = "⚠️";
+                var viStatus = VI_TREE_STATUS[status] || status;
+                var html =
+                    "<b>" + icon + " Cây: " + feature.properties.species + "</b>" +
+                    "<br>Mã: " + feature.properties.code +
+                    "<br>Tình trạng: " + viStatus;
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết cây", html);
+                });
+            },
+        }).addTo(map);
+
+        var incidentsLayer = L.geoJSON(incidentsData, {
+            pointToLayer: incidentPoint,
+            onEachFeature: function (feature, layer) {
+                var priority = feature.properties.priority;
+                var status = feature.properties.status;
+                var viPriority = VI_INCIDENT_PRIORITY[priority] || priority;
+                var viStatus = VI_INCIDENT_STATUS[status] || status;
+                var color = priority == "high" ? "red" : priority == "medium" ? "#f39c12" : "#2e7d32";
+                var p = feature.properties || {};
+                var html =
+                    "<b>🔥 SỰ CỐ: " + feature.properties.title + "</b>" +
+                    "<br>Mức độ: <span style='color:" + color + "'><b>" + viPriority + "</b></span>" +
+                    "<br>Trạng thái: " + viStatus +
+                    "<br>Loại sự cố: " + (p.incident_type || "-") +
+                    makeImageHtml(p.image_url, "Hình ảnh liên quan sự cố");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết sự cố", html);
+                });
+            },
+        }).addTo(map);
+
+        var roomsLayer = L.geoJSON(roomsData, { style: roomStyle });
+        var equipmentLayer = L.geoJSON(equipmentData, {
+            pointToLayer: equipmentPoint,
+            onEachFeature: function (feature, layer) {
+                var st = feature.properties && feature.properties.status;
+                var viStatus = VI_EQUIPMENT_STATUS[st] || st || "";
+                var p = feature.properties || {};
+                var html =
+                    "<b>⚙️ Thiết bị: " + (feature.properties.code || "") + "</b>" +
+                    "<br>Tên: " + (feature.properties.name || "") +
+                    "<br>Trạng thái: " + viStatus +
+                    "<br>Phòng/Tầng/Tòa: " +
+                    ((p.room_name || "") + (p.floor_name ? " - " + p.floor_name : "") + (p.building_name ? " - " + p.building_name : "")) +
+                    makeImageHtml(p.blueprint_url, "Sơ đồ phòng chứa thiết bị");
+                layer.bindPopup(html);
+                layer.on("click", function (e) {
+                    handleFeatureClick(e, "Chi tiết thiết bị", html);
+                });
+            },
+        });
+
+        var advancedResultLayer = L.layerGroup().addTo(map);
+
+        var overlayMaps = {
+            "Tòa nhà": buildingsLayer,
+            "Phòng (campus — tắt khi drill-down tầng)": roomsLayer,
+            "Cây xanh": treesLayer,
+            "Thiết bị GPS (campus)": equipmentLayer,
+            "Sự cố": incidentsLayer,
+        };
+        L.control.layers(null, overlayMaps).addTo(map);
+
+        function focusCampusOverview() {
+            try {
+                var allDataGroup = L.featureGroup([buildingsLayer, treesLayer, incidentsLayer, equipmentLayer]);
+                var b = allDataGroup.getBounds();
+                if (b && b.isValid()) {
+                    map.fitBounds(b, { padding: [36, 36], maxZoom: 18 });
+                    return;
+                }
+            } catch (e) {}
+            try {
+                if (Array.isArray(branchesNav) && branchesNav.length) {
+                    var points = [];
+                    branchesNav.forEach(function (b) {
+                        if (b && b.lat != null && b.lng != null) {
+                            points.push([parseFloat(b.lat), parseFloat(b.lng)]);
+                        }
+                    });
+                    if (points.length >= 2) {
+                        map.fitBounds(L.latLngBounds(points), { padding: [36, 36], maxZoom: 17 });
+                        return;
+                    }
+                    if (points.length === 1) {
+                        map.setView(points[0], 17);
+                        return;
+                    }
+                }
+            } catch (e) {}
+            map.setView([10.7984, 106.6655], 17);
+        }
+
+        if (!hasUrlFocus) {
+            focusCampusOverview();
+        }
+
+        function hideAllExceptBuildings() {
+            if (!map.hasLayer(buildingsLayer)) map.addLayer(buildingsLayer);
+            [treesLayer, roomsLayer, equipmentLayer, incidentsLayer, floorPlanGroup, buildingHighlightLayer].forEach(function (layer) {
+                if (map.hasLayer(layer)) map.removeLayer(layer);
+            });
+        }
+
+        function showAllBaseLayers() {
+            resetCampusView();
+            [buildingsLayer, treesLayer, incidentsLayer].forEach(function (layer) {
+                if (!map.hasLayer(layer)) map.addLayer(layer);
+            });
+            advancedResultLayer.clearLayers();
+            focusCampusOverview();
+        }
+
+        var btnShowAll = document.getElementById("btn-show-all");
+        if (btnShowAll) {
+            btnShowAll.addEventListener("click", function () {
+                showAllBaseLayers();
+            });
+        }
+        var drillSearchBtn = document.getElementById("drill-building-search-btn");
+        var drillSearchInput = document.getElementById("drill-building-search-input");
+        if (drillSearchBtn) drillSearchBtn.addEventListener("click", runDrillBuildingSearch);
+        if (drillSearchInput) {
+            drillSearchInput.addEventListener("keydown", function (ev) {
+                if (ev.key === "Enter") {
+                    ev.preventDefault();
+                    runDrillBuildingSearch();
+                }
+            });
+        }
+
+        var queryResultsEl = document.getElementById("query-results");
+
+        function renderResults(title, itemsHtml) {
+            queryResultsEl.innerHTML =
+                "<strong>" + title + "</strong>" + (itemsHtml || "<div>Không có kết quả.</div>");
+        }
+
+        var equipmentNavResultsEl = document.getElementById("equipment-nav-results");
+        var equipmentNavInputEl = document.getElementById("equipment-nav-search-input");
+
+        function runEquipmentNavSearch() {
+            if (!equipmentNavResultsEl) return;
+            var q = equipmentNavInputEl ? equipmentNavInputEl.value.trim() : "";
+            equipmentNavResultsEl.innerHTML = "";
+            if (!q) {
+                equipmentNavResultsEl.innerHTML = "<span class='hint' style='color:#888;font-size:12px'>Nhập ít nhất một ký tự.</span>";
+                return;
+            }
+            equipmentNavResultsEl.innerHTML = "<span class='hint' style='color:#888;font-size:12px'>Đang tìm…</span>";
+            fetch(equipmentSearchUrl + "?q=" + encodeURIComponent(q), { credentials: "same-origin" })
+                .then(function (r) {
+                    return r.json();
+                })
+                .then(function (data) {
+                    var list = data.results || [];
+                    equipmentNavResultsEl.innerHTML = "";
+                    if (!list.length) {
+                        equipmentNavResultsEl.innerHTML =
+                            "<span class='hint' style='color:#888;font-size:12px'>Không có thiết bị khớp.</span>";
+                        return;
+                    }
+                    if (list.length === 1) {
+                        equipmentNavResultsEl.innerHTML =
+                            "<span class='hint' style='color:#2e7d32;font-size:12px'>Tìm thấy 1 thiết bị — đang mở phòng…</span>";
+                        navigateFromEquipmentSearch(list[0]);
+                        renderSelectedDetails(
+                            "Thiết bị: " + (list[0].code || ""),
+                            "<div>Đã điều hướng tới phòng chứa thiết bị.</div>"
+                        );
+                        return;
+                    }
+                    list.forEach(function (hit) {
+                        var btn = document.createElement("button");
+                        btn.type = "button";
+                        var st = VI_EQUIPMENT_STATUS[hit.status] || hit.status || "";
+                        var loc =
+                            (hit.room_name || "?") +
+                            " · " +
+                            (hit.floor_name || "") +
+                            " · " +
+                            (hit.building_name || "");
+                        btn.innerHTML =
+                            "<b>" +
+                            (hit.code || "") +
+                            "</b> — " +
+                            (hit.name || "") +
+                            "<br><span style='color:#555;font-weight:400'>" +
+                            loc +
+                            "</span><br><span style='color:#888;font-size:11px'>" +
+                            (hit.equipment_type || "") +
+                            " · " +
+                            st +
+                            "</span>";
+                        btn.addEventListener("click", function () {
+                            navigateFromEquipmentSearch(hit);
+                            renderSelectedDetails(
+                                "Thiết bị: " + (hit.code || ""),
+                                "<div>Mở tầng / phòng và sơ đồ trong nhà.</div>"
+                            );
+                        });
+                        equipmentNavResultsEl.appendChild(btn);
+                    });
+                })
+                .catch(function () {
+                    equipmentNavResultsEl.innerHTML =
+                        "<span class='hint' style='color:#c62828;font-size:12px'>Lỗi tìm kiếm.</span>";
+                });
+        }
+
+        var btnEqNav = document.getElementById("btn-equipment-nav-search");
+        if (btnEqNav) btnEqNav.addEventListener("click", runEquipmentNavSearch);
+        if (equipmentNavInputEl) {
+            equipmentNavInputEl.addEventListener("keydown", function (ev) {
+                if (ev.key === "Enter") {
+                    ev.preventDefault();
+                    runEquipmentNavSearch();
+                }
+            });
+        }
+
+        document.getElementById("btn-dangerous-trees").addEventListener("click", function () {
+            fetch(dangerousTreesUrl + queryBranchQueryString())
+                .then(function (res) {
+                    return res.json();
+                })
+                .then(function (data) {
+                    resetCampusView();
+                    advancedResultLayer.clearLayers();
+                    hideAllExceptBuildings();
+                    if (!map.hasLayer(advancedResultLayer)) map.addLayer(advancedResultLayer);
+                    var items = [];
+                    if (data.features && data.features.length) {
+                        var layer = L.geoJSON(data, {
+                            pointToLayer: treePoint,
+                            onEachFeature: function (feature, layer) {
+                                var p = feature.properties || {};
+                                var text = (p.code || "") + " - " + (p.species || "");
+                                items.push('<div class="result-item">' + text + "</div>");
+                                layer.bindPopup("<b>Cây nguy hiểm</b><br>" + text);
+                            },
+                        }).addTo(advancedResultLayer);
+                        try {
+                            map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+                        } catch (e) {}
+                    } else {
+                        items.push(
+                            '<div class="result-item hint" style="color:#666">Không có cây nguy hiểm' +
+                                (document.getElementById("query-branch-filter") &&
+                                document.getElementById("query-branch-filter").value
+                                    ? " tại chi nhánh đã chọn."
+                                    : ".") +
+                                "</div>"
+                        );
+                    }
+                    renderResults("Cây nguy hiểm" + queryBranchFilterLabel(), items.join(""));
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    alert("Không truy vấn được cây nguy hiểm.");
+                });
+        });
+
+        document.getElementById("btn-devices-check").addEventListener("click", function () {
+            fetch(devicesToCheckUrl + queryBranchQueryString())
+                .then(function (res) {
+                    return res.json();
+                })
+                .then(function (data) {
+                    resetCampusView();
+                    advancedResultLayer.clearLayers();
+                    hideAllExceptBuildings();
+                    if (!map.hasLayer(advancedResultLayer)) map.addLayer(advancedResultLayer);
+                    var items = [];
+                    if (data.features && data.features.length) {
+                        var layer = L.geoJSON(data, {
+                            pointToLayer: equipmentPoint,
+                            onEachFeature: function (feature, layer) {
+                                var p = feature.properties || {};
+                                var text =
+                                    (p.code || "") +
+                                    " - " +
+                                    (p.name || "") +
+                                    " (" +
+                                    (p.status || "") +
+                                    ", phòng " +
+                                    (p.room_name || "?") +
+                                    ")";
+                                items.push('<div class="result-item">' + text + "</div>");
+                                var html =
+                                    "<b>Thiết bị cần kiểm tra</b><br>" +
+                                    text +
+                                    makeImageHtml(p.blueprint_url, "Sơ đồ phòng chứa thiết bị");
+                                layer.bindPopup(html);
+                                layer.on("click", function (e) {
+                                    handleFeatureClick(e, "Chi tiết thiết bị cần kiểm tra", html);
+                                });
+                            },
+                        }).addTo(advancedResultLayer);
+                        try {
+                            map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+                        } catch (e) {}
+                    } else {
+                        items.push(
+                            '<div class="result-item hint" style="color:#666">Không có thiết bị cần kiểm tra (có GPS)' +
+                                (document.getElementById("query-branch-filter") &&
+                                document.getElementById("query-branch-filter").value
+                                    ? " tại chi nhánh đã chọn."
+                                    : ".") +
+                                "</div>"
+                        );
+                    }
+                    renderResults(
+                        "Thiết bị cần kiểm tra/bảo trì (GPS)" + queryBranchFilterLabel(),
+                        items.join("")
+                    );
+                })
+                .catch(function (err) {
+                    console.error(err);
+                    alert("Không truy vấn được thiết bị cần kiểm tra.");
+                });
+        });
+
+        document.getElementById("btn-search-incidents").addEventListener("click", function () {
+            var q = document.getElementById("incident-search-input").value.trim().toLowerCase();
+            advancedResultLayer.clearLayers();
+            var allFeatures = incidentsData.features || [];
+            var filtered = allFeatures.filter(function (f) {
+                if (!q) return true;
+                var p = f.properties || {};
+                var title = (p.title || "").toLowerCase();
+                var status = (p.status || "").toLowerCase();
+                var priority = (p.priority || "").toLowerCase();
+                var viPriority = (p.vi_priority || "").toLowerCase();
+                var viStatus = (p.vi_status || "").toLowerCase();
+                var incidentType = (p.incident_type || "").toLowerCase();
+                var incidentTypeCode = (p.incident_type_code || "").toLowerCase();
+                var assetType = (p.asset_type || "").toLowerCase();
+                var assetSearchText = (p.asset_search_text || "").toLowerCase();
+                return (
+                    title.indexOf(q) !== -1 ||
+                    status.indexOf(q) !== -1 ||
+                    priority.indexOf(q) !== -1 ||
+                    viPriority.indexOf(q) !== -1 ||
+                    viStatus.indexOf(q) !== -1 ||
+                    incidentType.indexOf(q) !== -1 ||
+                    incidentTypeCode.indexOf(q) !== -1 ||
+                    assetType.indexOf(q) !== -1 ||
+                    assetSearchText.indexOf(q) !== -1
+                );
+            });
+            if (!filtered.length) {
+                renderResults("Kết quả tìm kiếm sự cố", "<div>Không tìm thấy sự cố phù hợp.</div>");
+                return;
+            }
+            resetCampusView();
+            hideAllExceptBuildings();
+            if (!map.hasLayer(advancedResultLayer)) map.addLayer(advancedResultLayer);
+            var collection = { type: "FeatureCollection", features: filtered };
+            var items = [];
+            var layer = L.geoJSON(collection, {
+                pointToLayer: incidentPoint,
+                onEachFeature: function (feature, layer) {
+                    var p = feature.properties || {};
+                    var text =
+                        (p.title || "") +
+                        " (" +
+                        (VI_INCIDENT_STATUS[p.status] || p.status || "") +
+                        ", " +
+                        (VI_INCIDENT_PRIORITY[p.priority] || p.priority || "") +
+                        ")";
+                    items.push('<div class="result-item">' + text + "</div>");
+                    var html = "<b>Sự cố</b><br>" + text + makeImageHtml(p.image_url, "Hình ảnh liên quan sự cố");
+                    layer.bindPopup(html);
+                    layer.on("click", function (e) {
+                        handleFeatureClick(e, "Chi tiết sự cố", html);
+                    });
+                },
+            }).addTo(advancedResultLayer);
+            try {
+                map.fitBounds(layer.getBounds(), { padding: [30, 30] });
+            } catch (e) {}
+            renderResults("Kết quả tìm kiếm sự cố", items.join(""));
+        });
+
+        (function () {
+            var legend = document.getElementById("map-legend");
+            var toggle = document.getElementById("legend-toggle");
+            var body = document.getElementById("legend-body");
+            if (legend && toggle && body) {
+                toggle.addEventListener("click", function () {
+                    legend.classList.toggle("collapsed");
+                    toggle.setAttribute(
+                        "aria-expanded",
+                        legend.classList.contains("collapsed") ? "false" : "true"
+                    );
+                });
+            }
+        })();
+
+        (function () {
+            var panel = document.getElementById("route-panel");
+            var rtoggle = document.getElementById("route-panel-toggle");
+            if (panel && rtoggle) {
+                rtoggle.addEventListener("click", function () {
+                    panel.classList.toggle("collapsed");
+                    rtoggle.setAttribute(
+                        "aria-expanded",
+                        panel.classList.contains("collapsed") ? "false" : "true"
+                    );
+                });
+            }
+        })();
+})();

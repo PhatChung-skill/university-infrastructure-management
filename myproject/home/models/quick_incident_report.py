@@ -1,12 +1,13 @@
-from django.db import models
+from django.contrib.gis.db import models
 
 
 class QuickIncidentReport(models.Model):
-    """
-    Tin nhắn báo cáo sự cố nhanh (text) do giảng viên gửi tới CSVC.
-    Trạng thái xem được dùng chung theo toàn bộ CSVC thông qua `is_seen`.
-    """
-
+    reporter_name = models.CharField(max_length=255, blank=True, null=True)
+    description = models.TextField()
+    photo = models.ImageField(upload_to="incidents/", blank=True, null=True)
+    reported_at = models.DateTimeField(auto_now_add=True)
+    geom = models.PointField(srid=4326, blank=True, null=True)
+    # Báo cáo nhanh dạng text từ giảng viên (bổ sung cho luồng CSVC)
     sender = models.ForeignKey(
         "AppUser",
         on_delete=models.SET_NULL,
@@ -14,21 +15,11 @@ class QuickIncidentReport(models.Model):
         blank=True,
         related_name="quick_incident_reports",
     )
-    message = models.TextField()
-
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    # Đã/Chưa được CSVC xem (dùng chung theo toàn bộ CSVC).
     is_seen = models.BooleanField(default=False)
-    seen_at = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        preview = (self.message or "").strip().replace("\n", " ")
-        if len(preview) > 30:
-            preview = f"{preview[:30]}..."
-        sender = self.sender.username if self.sender else "Unknown"
-        return f"QuickIncidentReport #{self.id} by {sender} ({preview})"
+    seen_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
-        ordering = ["-created_at"]
+        db_table = "quick_incident_report"
 
+    def __str__(self):
+        return f"Báo cáo nhanh - {self.reported_at.strftime('%d/%m/%Y')}"

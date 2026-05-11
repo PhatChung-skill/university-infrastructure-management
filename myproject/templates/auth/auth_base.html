@@ -1,0 +1,108 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/login.css' %}">
+  <link rel="stylesheet" href="{% static 'css/auth_flow.css' %}">
+  <title>{% block auth_title %}Tài khoản{% endblock %} · Hệ thống</title>
+  <style>
+    .password-toggle-wrap {
+      position: relative;
+    }
+    .password-toggle-wrap .form-control {
+      padding-right: 2.6rem;
+    }
+    .password-toggle-btn {
+      position: absolute;
+      top: 50%;
+      right: .5rem;
+      transform: translateY(-50%);
+      border: none;
+      background: transparent;
+      color: #5f6368;
+      padding: .1rem .25rem;
+      line-height: 1;
+      z-index: 3;
+      cursor: pointer;
+    }
+    .password-toggle-btn:hover {
+      color: #2e7d32;
+    }
+  </style>
+</head>
+<body class="login-bg auth-flow-page">
+  <header class="auth-topbar">
+    <div class="container py-3 d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <a href="{% url 'home' %}" class="auth-brand text-decoration-none d-flex align-items-center gap-2">
+        <span class="auth-brand-icon"><i class="bi bi-building-fill-check" aria-hidden="true"></i></span>
+        <span class="auth-brand-text">
+          <span class="d-block fw-bold text-dark lh-sm">Quản lý cơ sở hạ tầng</span>
+          <span class="small text-muted">Cổng dành cho cán bộ &amp; giảng viên</span>
+        </span>
+      </a>
+      <nav class="d-flex flex-wrap align-items-center gap-2 auth-nav-pair">
+        <a href="{% url 'home' %}" class="btn btn-auth-pill btn-auth-pill-outline">Trang chủ</a>
+        <a href="{% url 'login' %}" class="btn btn-auth-pill btn-auth-pill-primary">Đăng nhập</a>
+      </nav>
+    </div>
+  </header>
+
+  {% if messages %}
+  <div class="container pt-3">
+    {% for message in messages %}
+      <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <main class="container d-flex align-items-center justify-content-center flex-grow-1 py-4 py-md-5">
+    <div class="w-100" style="max-width: 440px;">
+      {% block auth_content %}{% endblock %}
+    </div>
+  </main>
+
+  <footer class="text-center text-muted small pb-4 px-3">
+    Hệ thống quản lý cơ sở hạ tầng
+  </footer>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function initPasswordVisibilityToggles() {
+      function enhancePasswordInput(input) {
+        if (!input || input.dataset.eyeEnhanced === "1") return;
+        var wrap = document.createElement("div");
+        wrap.className = "password-toggle-wrap";
+        input.parentNode.insertBefore(wrap, input);
+        wrap.appendChild(input);
+
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "password-toggle-btn";
+        btn.setAttribute("aria-label", "Hiện mật khẩu");
+        btn.setAttribute("title", "Hiện mật khẩu");
+        btn.innerHTML = '<i class="bi bi-eye" aria-hidden="true"></i>';
+        wrap.appendChild(btn);
+
+        btn.addEventListener("click", function () {
+          var isHidden = input.type === "password";
+          input.type = isHidden ? "text" : "password";
+          btn.innerHTML = isHidden
+            ? '<i class="bi bi-eye-slash" aria-hidden="true"></i>'
+            : '<i class="bi bi-eye" aria-hidden="true"></i>';
+          btn.setAttribute("aria-label", isHidden ? "Ẩn mật khẩu" : "Hiện mật khẩu");
+          btn.setAttribute("title", isHidden ? "Ẩn mật khẩu" : "Hiện mật khẩu");
+        });
+        input.dataset.eyeEnhanced = "1";
+      }
+
+      document.querySelectorAll('input[type="password"]').forEach(enhancePasswordInput);
+    })();
+  </script>
+</body>
+</html>

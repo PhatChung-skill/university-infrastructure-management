@@ -45,9 +45,161 @@
       background: linear-gradient(135deg, #1b5e20, #2e7d32);
       border-color: #1b5e20;
     }
+    .teacher-rooms-footer {
+      border-top: 1px solid rgba(46, 125, 50, 0.12);
+      padding-top: 1rem;
+      margin-top: 1rem;
+    }
+    .pagination-teacher {
+      --teacher-page-border: rgba(46, 125, 50, 0.35);
+      --teacher-page-color: #1b5e20;
+    }
+    .pagination-teacher .page-link {
+      color: var(--teacher-page-color);
+      border-color: var(--teacher-page-border);
+      background-color: #fff;
+      min-width: 2.25rem;
+      text-align: center;
+      font-size: 1rem;
+      line-height: 1.25;
+      padding: 0.35rem 0.5rem;
+      border-radius: 8px;
+    }
+    .pagination-teacher .page-item + .page-item {
+      margin-left: 0.25rem;
+    }
+    .pagination-teacher .page-item:not(.disabled) .page-link:hover {
+      color: #fff;
+      background: linear-gradient(135deg, #2e7d32, #43a047);
+      border-color: #2e7d32;
+    }
+    .pagination-teacher .page-item.disabled .page-link {
+      color: #9e9e9e;
+      background-color: #f1f8e9;
+      border-color: rgba(46, 125, 50, 0.15);
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+    /* Cùng chiều cao tối thiểu mỗi ô (dữ liệu + dòng pad) — trang 2 không thấp hơn trang 1 */
+    #teacher-rooms-table .table tbody td {
+      min-height: 3.5rem;
+      vertical-align: middle;
+      padding-top: 0.55rem;
+      padding-bottom: 0.55rem;
+    }
+    .teacher-room-row-placeholder td {
+      background: rgba(241, 248, 233, 0.35);
+      border-color: rgba(46, 125, 50, 0.06);
+    }
+    .teacher-rooms-card-header {
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.12);
+    }
+    .teacher-rooms-title-block h5 {
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+      letter-spacing: 0.02em;
+    }
+    .teacher-room-search-shell {
+      margin: 0;
+    }
+    .teacher-room-input-group {
+      border-radius: 999px;
+      overflow: hidden;
+      background: #fff;
+      border: 1px solid rgba(255, 255, 255, 0.55);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+      max-width: 300px;
+      min-width: 200px;
+    }
+    .teacher-room-input-group .form-control {
+      border: 0;
+      padding-left: 1rem;
+      font-size: 0.9rem;
+    }
+    .teacher-room-input-group .form-control:focus {
+      box-shadow: none;
+    }
+    .teacher-room-input-group .btn-search-icon {
+      border: 0;
+      background: linear-gradient(135deg, #f1f8e9, #fff);
+      color: #1b5e20;
+      padding: 0.4rem 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .teacher-room-input-group .btn-search-icon:hover {
+      background: #fff;
+      color: #2e7d32;
+    }
+    .teacher-room-input-group .btn-search-icon:focus-visible {
+      box-shadow: none;
+      outline: 2px solid rgba(255, 255, 255, 0.9);
+      outline-offset: 2px;
+    }
+    .teacher-room-clear {
+      font-size: 0.8rem;
+      opacity: 0.9;
+    }
+    .teacher-room-clear:hover {
+      opacity: 1;
+      text-decoration: underline !important;
+    }
+    @media (max-width: 767.98px) {
+      .navbar-teacher {
+        margin-bottom: .75rem !important;
+      }
+      .navbar-teacher .container-fluid {
+        padding-left: .75rem;
+        padding-right: .75rem;
+      }
+      .navbar-teacher .navbar-brand {
+        max-width: 68vw;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .card-teacher {
+        border-radius: 12px;
+      }
+      .card-teacher-header {
+        border-radius: 12px 12px 0 0;
+        padding: .85rem 1rem;
+      }
+      .teacher-rooms-card-header {
+        align-items: stretch !important;
+      }
+      .teacher-room-input-group {
+        width: 100%;
+        max-width: none;
+        min-width: 0;
+      }
+      .teacher-room-search-shell {
+        width: 100%;
+      }
+      .card-body {
+        padding: 1rem !important;
+      }
+      .table-responsive {
+        border: 1px solid rgba(46, 125, 50, .14);
+        border-radius: 10px;
+      }
+      .table {
+        min-width: 640px;
+      }
+      .teacher-rooms-footer {
+        flex-direction: column;
+        align-items: stretch !important;
+      }
+      .teacher-rooms-footer .ms-auto {
+        margin-left: 0 !important;
+      }
+      .teacher-rooms-footer .btn {
+        width: 100%;
+      }
+    }
   </style>
 </head>
-<body>
+<body data-teacher-rooms-ajax="1">
   <!-- Thanh điều hướng -->
   <nav class="navbar navbar-expand-lg navbar-teacher mb-4">
     <div class="container-fluid">
@@ -97,6 +249,9 @@
 
             <form method="post" novalidate>
               {% csrf_token %}
+              {% if teacher_room_search_q %}
+                <input type="hidden" name="room_q" value="{{ teacher_room_search_q }}">
+              {% endif %}
               <div class="mb-3">
                 <label class="form-label">{{ teacher_quick_report_form.message.label }}</label>
                 {{ teacher_quick_report_form.message }}
@@ -126,17 +281,19 @@
               {% endif %}
 
               <div class="small text-muted mb-2">
-                Thời gian: {{ latest_quick_report.created_at|date:"d/m/Y H:i" }} |
+                Thời gian: {{ latest_quick_report.reported_at|date:"d/m/Y H:i" }} |
                 Người gửi:
                 {% if latest_quick_report.sender %}
                   {{ latest_quick_report.sender.username }}
+                {% elif latest_quick_report.reporter_name %}
+                  {{ latest_quick_report.reporter_name }}
                 {% else %}
                   -
                 {% endif %}
               </div>
 
               <div style="white-space: pre-wrap;">
-                {{ latest_quick_report.message|linebreaksbr }}
+                {{ latest_quick_report.description|linebreaksbr }}
               </div>
             {% else %}
               <p class="text-muted mb-0">Chưa có báo cáo nhanh nào.</p>
@@ -144,13 +301,32 @@
           </div>
         </div>
 
-        <div class="card card-teacher mb-3">
-          <div class="card-teacher-header">
-            <h5 class="mb-0">Danh sách phòng học & tình trạng thiết bị</h5>
-            <small class="d-block mt-1">
-              Giảng viên chỉ có quyền xem (read-only): vị trí phòng, loại phòng và tình trạng thiết bị.
-              Nếu phát hiện sự cố, vui lòng báo lại cho bộ phận CSVC.
-            </small>
+        <div class="card card-teacher mb-3" id="teacher-rooms-table">
+          <div class="card-teacher-header teacher-rooms-card-header d-flex flex-wrap align-items-center justify-content-between gap-3 px-3 px-lg-4 py-3">
+            <div class="teacher-rooms-title-block flex-grow-1 min-w-0">
+              <h5 class="mb-0 text-white fw-bold">Danh sách phòng học &amp; tình trạng thiết bị</h5>
+              <small class="d-block mt-2 text-white" style="opacity: 0.88; max-width: 42rem; line-height: 1.45;">
+                Giảng viên chỉ có quyền xem (read-only): tòa, tầng, phòng, loại phòng và tình trạng thiết bị.
+                Nếu phát hiện sự cố, vui lòng báo lại cho bộ phận CSVC.
+              </small>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2 ms-lg-auto flex-shrink-0">
+              <form method="get" action="{% url 'teacher_dashboard' %}" class="teacher-room-search-shell">
+                <div class="input-group input-group-sm teacher-room-input-group">
+                  <input type="search" name="room_q" value="{{ teacher_room_search_q }}"
+                         class="form-control" placeholder="Tòa, tầng, phòng, loại, trạng thái…"
+                         aria-label="Lọc danh sách phòng" autocomplete="off">
+                  <button type="submit" class="btn btn-search-icon" aria-label="Tìm kiếm">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16" aria-hidden="true">
+                      <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                    </svg>
+                  </button>
+                </div>
+              </form>
+              {% if teacher_room_search_q %}
+                <a class="btn btn-link btn-sm text-white teacher-room-clear p-0 text-decoration-none" href="{% url 'teacher_dashboard' %}">Xóa lọc</a>
+              {% endif %}
+            </div>
           </div>
           <div class="card-body">
             <div class="table-responsive">
@@ -158,6 +334,7 @@
                 <thead class="table-light">
                   <tr>
                     <th>Tòa nhà</th>
+                    <th>Tầng</th>
                     <th>Phòng</th>
                     <th>Loại phòng</th>
                     <th>Sức chứa</th>
@@ -165,9 +342,10 @@
                   </tr>
                 </thead>
                 <tbody>
-                  {% for item in room_status_list %}
+                  {% for item in room_page %}
                     <tr>
                       <td>{% if item.room.floor and item.room.floor.building %}{{ item.room.floor.building.name }}{% else %}-{% endif %}</td>
+                      <td>{% if item.room.floor %}{{ item.room.floor.name }}{% else %}-{% endif %}</td>
                       <td>{{ item.room.name }}</td>
                       <td>{{ item.room.get_room_type_display }}</td>
                       <td>{% if item.room.capacity %}{{ item.room.capacity }}{% else %}-{% endif %}</td>
@@ -178,20 +356,75 @@
                       </td>
                     </tr>
                   {% empty %}
-                    <tr>
-                      <td colspan="5" class="text-muted text-center">
-                        Chưa có thông tin phòng học.
-                      </td>
-                    </tr>
+                    {% for _ in room_pad_rows %}
+                      <tr class="teacher-room-row-placeholder" aria-hidden="true">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                      </tr>
+                    {% endfor %}
                   {% endfor %}
+                  {% if room_page.paginator.count > 0 %}
+                    {% for _ in room_pad_rows %}
+                      <tr class="teacher-room-row-placeholder" aria-hidden="true">
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                        <td>&nbsp;</td>
+                      </tr>
+                    {% endfor %}
+                  {% endif %}
                 </tbody>
               </table>
             </div>
 
-            <div class="mt-3 text-end">
-              <a href="{% url 'map_view' %}" class="btn btn-teacher-primary">
-                Xem vị trí phòng trên bản đồ
-              </a>
+            <div class="teacher-rooms-footer d-flex flex-wrap align-items-center justify-content-between gap-3">
+              <div class="d-flex align-items-center">
+                {% if room_page.paginator.num_pages > 1 %}
+                  <nav id="teacher-room-pagination" aria-label="Phân trang danh sách phòng">
+                    <ul class="pagination pagination-teacher pagination-sm mb-0">
+                      <li class="page-item{% if not room_page.has_previous %} disabled{% endif %}">
+                        {% if room_page.has_previous %}
+                          <a class="page-link" href="?page=1{{ teacher_room_q_suffix }}" title="Trang đầu" aria-label="Trang đầu">«</a>
+                        {% else %}
+                          <span class="page-link" aria-disabled="true" title="Trang đầu">«</span>
+                        {% endif %}
+                      </li>
+                      <li class="page-item{% if not room_page.has_previous %} disabled{% endif %}">
+                        {% if room_page.has_previous %}
+                          <a class="page-link" href="?page={{ room_page.previous_page_number }}{{ teacher_room_q_suffix }}" title="Trang trước" aria-label="Trang trước">‹</a>
+                        {% else %}
+                          <span class="page-link" aria-disabled="true" title="Trang trước">‹</span>
+                        {% endif %}
+                      </li>
+                      <li class="page-item{% if not room_page.has_next %} disabled{% endif %}">
+                        {% if room_page.has_next %}
+                          <a class="page-link" href="?page={{ room_page.next_page_number }}{{ teacher_room_q_suffix }}" title="Trang sau" aria-label="Trang sau">›</a>
+                        {% else %}
+                          <span class="page-link" aria-disabled="true" title="Trang sau">›</span>
+                        {% endif %}
+                      </li>
+                      <li class="page-item{% if not room_page.has_next %} disabled{% endif %}">
+                        {% if room_page.has_next %}
+                          <a class="page-link" href="?page={{ room_page.paginator.num_pages }}{{ teacher_room_q_suffix }}" title="Trang cuối" aria-label="Trang cuối">»</a>
+                        {% else %}
+                          <span class="page-link" aria-disabled="true" title="Trang cuối">»</span>
+                        {% endif %}
+                      </li>
+                    </ul>
+                  </nav>
+                {% endif %}
+              </div>
+              <div class="ms-auto">
+                <a href="{% url 'map_view' %}" class="btn btn-teacher-primary">
+                  Xem vị trí phòng trên bản đồ
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -200,6 +433,59 @@
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    (function () {
+      var rootId = "teacher-rooms-table";
+
+      function swapTeacherRooms(url) {
+        return fetch(url, {
+          credentials: "same-origin",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        })
+          .then(function (res) {
+            if (!res.ok) throw new Error("bad status");
+            return res.text();
+          })
+          .then(function (html) {
+            var doc = new DOMParser().parseFromString(html, "text/html");
+            var next = doc.getElementById(rootId);
+            var cur = document.getElementById(rootId);
+            if (!next || !cur) throw new Error("missing fragment");
+            cur.innerHTML = next.innerHTML;
+          });
+      }
+
+      document.addEventListener("click", function (e) {
+        if (!document.body.getAttribute("data-teacher-rooms-ajax")) return;
+        var nav = e.target.closest("#teacher-room-pagination");
+        if (!nav) return;
+        var a = e.target.closest("a.page-link");
+        if (!a) return;
+        var href = a.getAttribute("href") || "";
+        if (href.indexOf("page=") === -1) return;
+        e.preventDefault();
+        var u = new URL(href, window.location.href);
+        var target = u.pathname + u.search;
+        swapTeacherRooms(u.href)
+          .then(function () {
+            try {
+              history.pushState({ teacherRoomsAjax: true }, "", target);
+            } catch (err) {}
+          })
+          .catch(function () {
+            window.location.href = u.href;
+          });
+      });
+
+      window.addEventListener("popstate", function () {
+        if (!document.getElementById(rootId)) return;
+        if (!document.body.getAttribute("data-teacher-rooms-ajax")) return;
+        swapTeacherRooms(window.location.pathname + window.location.search).catch(function () {
+          window.location.reload();
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
 

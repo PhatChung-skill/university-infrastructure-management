@@ -46,9 +46,10 @@
             <th>Tên</th>
             <th>Loại</th>
             <th>Sức chứa</th>
-            <th>Tầng / Tòa nhà</th>
-            <th>Bản đồ</th>
+            <th>Tầng</th>
+            <th>Tòa nhà</th>
             <th>Sơ đồ</th>
+            <th>Bản đồ</th>
             <th class="text-end">Thao tác</th>
           </tr>
         </thead>
@@ -59,23 +60,22 @@
             <td><a class="text-decoration-none fw-semibold text-success" href="{% url 'admin_room_edit' r.pk %}">{{ r.name }}</a></td>
             <td>{{ r.get_room_type_display }}</td>
             <td>{{ r.capacity|default:"-" }}</td>
-            <td>{{ r.floor.name }} - {{ r.floor.building.name }}</td>
+            <td>{{ r.floor.name|default:"-" }}</td>
+            <td>{{ r.floor.building.name|default:"-" }}</td>
             <td>
-              {% if r.geom %}
-                <span class="badge bg-success" title="Có tọa độ đa giác">Có vị trí</span>
+              {% if r.blueprint %}
+                <a href="{{ r.blueprint.url }}" target="_blank" rel="noopener" title="Xem sơ đồ">
+                  <img src="{{ r.blueprint.url }}" alt="Sơ đồ {{ r.name }}" class="rounded border" style="max-height:44px;max-width:72px;object-fit:cover;">
+                </a>
               {% else %}
-                <span class="badge bg-secondary">Chưa có vị trí</span>
-              {% endif %}
-              
-              {% if r.blueprint_url %}
-                 <span class="badge bg-info text-dark" title="Có sơ đồ mặt bằng">Có sơ đồ</span>
+                <span class="text-muted small">—</span>
               {% endif %}
             </td>
             <td>
-              {% if r.blueprint_url %}
-                <img src="{{ r.blueprint_url }}" alt="Blueprint {{ r.name }}" style="width:72px;height:48px;object-fit:cover;border-radius:8px;border:1px solid #d7e0d7;">
+              {% if r.geom %}
+                <span class="badge bg-success" title="Có tọa độ">Có vị trí</span>
               {% else %}
-                <span class="text-muted small">-</span>
+                <span class="badge bg-secondary">Chưa có vị trí</span>
               {% endif %}
             </td>
             <td class="text-end" onclick="event.stopPropagation();">
@@ -84,7 +84,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="8" class="text-center text-muted">Chưa có phòng nào. Nhấn «Thêm phòng» để tạo mới.</td></tr>
+          <tr><td colspan="9" class="text-center text-muted">Chưa có phòng nào. Nhấn «Thêm phòng» để tạo mới.</td></tr>
           {% endfor %}
         </tbody>
       </table>

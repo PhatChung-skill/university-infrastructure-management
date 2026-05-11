@@ -1,9 +1,11 @@
 from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.gis.admin import GISModelAdmin
+from .admin_forms import AppUserAdminForm
 from .models import (
     Role, AppUser, Building, Floor, Room, Tree, Equipment,
-    Asset, IncidentType, Incident, Maintenance
+    Asset, IncidentType, Incident, Maintenance,
+    AboutHeroSection, AboutCoreValue, AboutAnnouncement, AboutFeaturedEvent
 )
 
 # 1. Các Model KHÔNG CÓ bản đồ (Dùng admin.ModelAdmin thường)
@@ -13,6 +15,7 @@ class RoleAdmin(admin.ModelAdmin):
 
 @admin.register(AppUser)
 class AppUserAdmin(admin.ModelAdmin):
+    form = AppUserAdminForm
     list_display = ('username', 'role')
     list_filter = ('role',)
 
@@ -22,11 +25,15 @@ class AppUserAdmin(admin.ModelAdmin):
         - Đồng bộ sang bảng User mặc định của Django để dùng cho đăng nhập (/login/)
         - AppUser.password đã được hash trong model, nên copy thẳng sang User.password
         """
+        if not change:
+            obj.must_change_password = True
         super().save_model(request, obj, form, change)
 
         # Tạo (hoặc lấy) user tương ứng trong bảng auth_user
         user, created = User.objects.get_or_create(username=obj.username)
         user.password = obj.password  # đã hash từ AppUser.save()
+        if getattr(obj, "email", ""):
+            user.email = obj.email
         user.is_active = True
 
         # Nếu role là Admin thì cho quyền staff để vào /admin/ nếu cần
@@ -52,6 +59,34 @@ class MaintenanceAdmin(admin.ModelAdmin):
     list_display = ('maintenance_type', 'maintenance_date', 'asset', 'cost')
     list_filter = ('maintenance_type', 'maintenance_date')
 
+
+@admin.register(AboutAnnouncement)
+class AboutAnnouncementAdmin(admin.ModelAdmin):
+    list_display = ("title", "is_published", "published_at", "updated_at")
+    list_filter = ("is_published",)
+    search_fields = ("title", "summary", "content")
+
+
+@admin.register(AboutHeroSection)
+class AboutHeroSectionAdmin(admin.ModelAdmin):
+    list_display = ("title", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("title", "welcome_text")
+
+
+@admin.register(AboutCoreValue)
+class AboutCoreValueAdmin(admin.ModelAdmin):
+    list_display = ("title", "display_order", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("title", "description")
+
+
+@admin.register(AboutFeaturedEvent)
+class AboutFeaturedEventAdmin(admin.ModelAdmin):
+    list_display = ("title", "event_date", "is_published", "published_at")
+    list_filter = ("is_published",)
+    search_fields = ("title", "summary")
+
 # BỔ SUNG: Bảng Floor (Không có cột geom nên dùng ModelAdmin thường)
 @admin.register(Floor)
 class FloorAdmin(admin.ModelAdmin):
@@ -69,7 +104,6 @@ class BuildingAdmin(GISModelAdmin):
 
 @admin.register(Room)
 class RoomAdmin(GISModelAdmin):
-    # CẬP NHẬT: Đổi 'building' thành 'floor'
     list_display = ('name', 'room_type', 'floor', 'capacity')
     list_filter = ('room_type', 'floor')
     search_fields = ('name',)

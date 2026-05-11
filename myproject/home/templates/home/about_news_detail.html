@@ -1,0 +1,104 @@
+{% load static %}
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>{{ article.title }} - Trang giới thiệu</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    :root{
+      --brand:#2e7d32;
+      --brand-dark:#1b5e20;
+      --soft:#f4faf6;
+      --ink:#0f172a;
+      --muted:#475569;
+      --border:rgba(27,94,32,.12);
+    }
+    body{
+      background:
+        radial-gradient(860px 380px at 0% 0%, rgba(46,125,50,.12), transparent 60%),
+        radial-gradient(860px 380px at 100% 0%, rgba(56,142,60,.10), transparent 60%),
+        var(--soft);
+      color:var(--ink);
+    }
+    .article-shell{
+      max-width: 980px;
+      margin: 0 auto;
+    }
+    .article-card{
+      border:1px solid var(--border);
+      border-radius:20px;
+      background:#fff;
+      box-shadow:0 14px 36px rgba(15,46,20,.08);
+      overflow:hidden;
+    }
+    .article-cover{
+      width:100%;
+      max-height:420px;
+      object-fit:cover;
+      display:block;
+    }
+    .article-meta{
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin-bottom:14px;
+    }
+    .meta-chip{
+      border:1px solid var(--border);
+      background:#f0fdf4;
+      color:#14532d;
+      border-radius:999px;
+      padding:4px 10px;
+      font-size:.82rem;
+      font-weight:600;
+    }
+    .article-title{
+      font-weight:900;
+      line-height:1.3;
+      margin-bottom:10px;
+    }
+    .article-summary{
+      color:var(--muted);
+      font-size:1.02rem;
+      line-height:1.7;
+      border-left:4px solid #86efac;
+      padding-left:12px;
+      margin-bottom:20px;
+    }
+    .article-content{
+      font-size:1.03rem;
+      line-height:1.8;
+      color:#1f2937;
+      white-space:pre-line;
+    }
+    .back-btn{
+      border-radius:999px;
+      padding:6px 14px;
+      font-weight:600;
+    }
+  </style>
+</head>
+<body>
+  <main class="container py-4 py-lg-5">
+    <div class="article-shell">
+      <a href="{% url 'about_school' %}" class="btn btn-outline-secondary btn-sm mb-3 back-btn">← Quay lại trang giới thiệu</a>
+      <article class="article-card">
+        {% if article.thumbnail %}
+          <img src="{{ article.thumbnail.url }}" alt="{{ article.title }}" class="article-cover">
+        {% endif %}
+        <div class="p-4 p-lg-5">
+          <div class="article-meta">
+            <span class="meta-chip">Tin cơ sở hạ tầng</span>
+            <span class="meta-chip">Đăng: {{ article.published_at|date:"d/m/Y H:i" }}</span>
+          </div>
+          <h1 class="h2 article-title">{{ article.title }}</h1>
+          <p class="article-summary mb-4">{{ article.summary }}</p>
+          <div class="article-content">{{ article.content }}</div>
+        </div>
+      </article>
+    </div>
+  </main>
+</body>
+</html>

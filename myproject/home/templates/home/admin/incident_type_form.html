@@ -27,11 +27,16 @@
             <div class="col-md-6 mb-3">
               <label class="form-label">{{ form.default_severity.label }}</label>
               {{ form.default_severity }}{% for e in form.default_severity.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+              <small class="text-muted d-block mt-1">Nếu chọn "Khẩn cấp", mức độ sẽ tự động là 5.</small>
             </div>
           </div>
           <div class="mb-3">
             <label class="form-label">{{ form.name.label }}</label>
             {{ form.name }}{% for e in form.name.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">{{ form.applies_to.label }}</label>
+            {{ form.applies_to }}{% for e in form.applies_to.errors %}<div class="text-danger small">{{ e }}</div>{% endfor %}
           </div>
           <div class="mb-3">
             <label class="form-label">{{ form.description.label }}</label>
@@ -50,4 +55,48 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+  var severity = document.getElementById('id_default_severity');
+  var appliesToInputs = document.querySelectorAll('input[name="applies_to"]');
+  if (!appliesToInputs.length || !severity) return;
+
+  severity.setAttribute('min', '1');
+  severity.setAttribute('max', '5');
+
+  function clampSeverity() {
+    var v = parseInt(severity.value || '', 10);
+    if (isNaN(v)) return;
+    if (v < 1) severity.value = '1';
+    if (v > 5) severity.value = '5';
+  }
+
+  function syncEmergencySeverity() {
+    var emergency = Array.prototype.some.call(appliesToInputs, function (el) {
+      return el.checked && el.value === 'emergency';
+    });
+    if (emergency) {
+      severity.value = '5';
+      severity.readOnly = true;
+      severity.style.backgroundColor = '#e9ecef';
+      severity.style.cursor = 'not-allowed';
+    } else {
+      severity.readOnly = false;
+      severity.style.backgroundColor = '';
+      severity.style.cursor = '';
+      clampSeverity();
+    }
+  }
+
+  Array.prototype.forEach.call(appliesToInputs, function (el) {
+    el.addEventListener('change', syncEmergencySeverity);
+  });
+  severity.addEventListener('input', clampSeverity);
+  severity.addEventListener('change', clampSeverity);
+  syncEmergencySeverity();
+})();
+</script>
 {% endblock %}
